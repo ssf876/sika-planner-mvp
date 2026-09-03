@@ -33,6 +33,7 @@ export default async function DashboardPage() {
           <Link href="/planner">Monthly planner</Link>
           <Link href="/transactions">Enter transactions</Link>
           <Link href="/funds">Funds &amp; goals</Link>
+          <Link href="/reports">Reports</Link>
           <form action={signOutAction}>
             <button type="submit">Sign out</button>
           </form>

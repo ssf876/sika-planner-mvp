@@ -7,6 +7,8 @@
 
 import type {
   Allocation,
+  AnnualSummary,
+  AnnualSummaryOptions,
   BudgetEngineRuntime,
   CategoryAvailable,
   DangerCategoryState,
@@ -16,7 +18,8 @@ import type {
   EngineState,
   FundDangerState,
   FundPace,
-  MonthCashflow,
+  PlannedVsActualReport,
+  PvaOptions,
   RiskAppetite,
   Transaction,
   TransactionInput,
@@ -31,6 +34,11 @@ import {
   worstDangerState,
 } from "./danger";
 import { EngineError } from "./errors";
+import {
+  buildAnnualSummary,
+  buildPlannedVsActual,
+  computeMonthCashflow,
+} from "./pva";
 import {
   assertIntegerCents,
   assertPositiveCents,
@@ -174,26 +182,9 @@ export function createBudgetEngine(
     });
   };
 
-  const monthCashflow = (monthId: string): MonthCashflow => {
-    const month = requireMonth(monthId);
-    const txs = transactionsInMonth(monthId);
-    const incomeReceivedCents = txs
-      .filter((tx) => tx.kind === "INCOME")
-      .reduce((sum, tx) => sum + tx.amountCents, 0);
-    const spendingCents = txs
-      .filter((tx) => tx.kind === "EXPENSE")
-      .reduce((sum, tx) => sum - tx.amountCents, 0);
-    const fundDrawCents = state.fundDraws
-      .filter((d) => d.monthId === monthId)
-      .reduce((sum, d) => sum + d.amountCents, 0);
-    return {
-      monthId: month.id,
-      incomeReceivedCents,
-      fundDrawCents,
-      spendingCents,
-      netCashflowCents: incomeReceivedCents + fundDrawCents - spendingCents,
-    };
-  };
+  // One derivation shared with the report math (src/engine/pva.ts) so the
+  // ledger view and the report can never drift.
+  const monthCashflow = (monthId: string) => computeMonthCashflow(state, monthId);
 
   const accountBalanceCents = (accountId: string): number => {
     const account = requireAccount(accountId);
@@ -563,6 +554,18 @@ export function createBudgetEngine(
     };
   };
 
+  // ── planned-vs-actual view (D9) ──────────────────────────────────────
+
+  const plannedVsActual = (
+    monthId: string,
+    options?: PvaOptions,
+  ): PlannedVsActualReport => buildPlannedVsActual(state, monthId, options);
+
+  const annualSummary = (
+    year: number,
+    options?: AnnualSummaryOptions,
+  ): AnnualSummary => buildAnnualSummary(state, year, options);
+
   return {
     readyToAssignCents,
     assign,
@@ -580,5 +583,7 @@ export function createBudgetEngine(
     recordTransfer,
     snapshot: (): EngineState => structuredClone(state),
     dangerZone,
+    plannedVsActual,
+    annualSummary,
   };
 }

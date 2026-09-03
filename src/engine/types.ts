@@ -1,3 +1,4 @@
+
 // Engine domain types — pure TypeScript, zero DB or framework imports (D2).
 //
 // These mirror the Prisma models/enums in prisma/schema.prisma (the hydration
@@ -12,6 +13,9 @@ export type TxKind = "INCOME" | "EXPENSE" | "TRANSFER";
 export type ReviewState =
   "AUTO_ACCEPTED" | "NEEDS_REVIEW" | "CONFIRMED" | "EDITED";
 export type FundKind = "SINKING" | "STATIC";
+// Advisor vocabulary (D11 will hydrate these; the annual summary renders them).
+export type LifeEventKind =
+  "HOME_PURCHASE" | "MOVE" | "WEDDING" | "CHILD" | "CUSTOM";
 export type RiskAppetite = "CAUTIOUS" | "BALANCED" | "AGGRESSIVE";
 
 export interface Account {
@@ -266,6 +270,134 @@ export interface DangerZoneReport {
   funds: FundDangerState[];
 }
 
+// ─── Planned vs Actual + annual summary (D9) ───────────────────────────────
+
+/** Where one category's month landed against its plan. */
+export type PvaVerdict = "saved" | "overspent" | "as-planned";
+
+export interface PvaCategoryRow {
+  categoryId: string;
+  /** Assigned for the month (0 when the spending was unplanned). */
+  plannedCents: number;
+  /** All spending charged to the category this month, pop-up draws included. */
+  actualCents: number;
+  /** The pop-up slice of actual: expenses paid by a fund draw. */
+  poppedUpCents: number;
+  /** actual − popped up: the spending the plan itself had to absorb. */
+  ordinarySpentCents: number;
+  /** planned − ordinarySpent; positive = money stayed put. */
+  varianceCents: number;
+  verdict: PvaVerdict;
+}
+
+export interface PvaDrawRow {
+  drawId: string;
+  fundId: string;
+  fundName: string;
+  fundKind: FundKind;
+  amountCents: number;
+  /** True when the draw paid a pop-up expense (sinking funds). */
+  paidExpense: boolean;
+  /** Payee of the pop-up expense, when paidExpense. */
+  expensePayee?: string;
+}
+
+export interface PlannedVsActualReport {
+  monthId: string;
+  /** Σ planned over reported categories (unplanned rows add 0). */
+  plannedTotalCents: number;
+  actualTotalCents: number;
+  /** Unspent planned dollars — the "saved" bucket. */
+  savedTotalCents: number;
+  /** Spending beyond plan — the over-bucket. */
+  overspentTotalCents: number;
+  /** Planned dollars in categories whose ordinary spending tracked the plan. */
+  asPlannedPlannedCents: number;
+  /** All fund draws released this month (sinking pop-ups + static draws). */
+  poppedUpTotalCents: number;
+  incomeReceivedCents: number;
+  netCashflowCents: number;
+  categories: PvaCategoryRow[];
+  draws: PvaDrawRow[];
+}
+
+export interface PvaOptions {
+  /**
+   * |ordinary spent − planned| ≤ floor(planned × band / 100) counts as
+   * as-planned. Default 10 (% of planned) — the same ±10% convention as the
+   * danger-zone watch line. 0 means exact-match only.
+   */
+  asPlannedBandPercent?: number;
+}
+
+/** One budgeted month's slice of the annual summary. */
+export interface AnnualMonthRow {
+  monthId: string;
+  month: number;
+  label: string;
+  plannedTotalCents: number;
+  incomeReceivedCents: number;
+  poppedUpCents: number;
+  spendingCents: number;
+  netCashflowCents: number;
+  savedCents: number;
+  overspentCents: number;
+  asPlannedPlannedCents: number;
+}
+
+/** Net worth (Σ account balances) as of the last day of one month. */
+export interface NetWorthPoint {
+  month: number;
+  label: string;
+  netWorthCents: number;
+}
+
+/** A fund draw large enough to be a life event in the annual summary. */
+export interface MajorPopUpRow extends PvaDrawRow {
+  monthId: string;
+  monthLabel: string;
+}
+
+/**
+ * Confirmed life events, passed in by the caller: the engine state does not
+ * carry them (they are advisor rows, D11) so the read layer hands them over.
+ */
+export interface ConfirmedLifeEvent {
+  id: string;
+  kind: LifeEventKind;
+  /** Household-local ISO date the season started, when known. */
+  seasonStart?: string;
+}
+
+export interface AnnualSummary {
+  year: number;
+  /**
+   * Net cashflow ÷ inflows (income received + fund draws), as an integer
+   * percent floored toward zero; null for a year with no inflows.
+   */
+  savingsRatePercent: number | null;
+  totalIncomeCents: number;
+  totalPoppedUpCents: number;
+  totalSpendingCents: number;
+  totalSavedCents: number;
+  totalOverspentCents: number;
+  /** Budgeted months of the year, calendar order. */
+  months: AnnualMonthRow[];
+  /** Twelve points, calendar order — months without activity carry the running balance. */
+  netWorthTrend: NetWorthPoint[];
+  /** Draws at or above the major-pop-up threshold, largest first. */
+  majorPopUps: MajorPopUpRow[];
+  /** Confirmed seasons starting in this year, chronological. */
+  confirmedSeasons: ConfirmedLifeEvent[];
+}
+
+export interface AnnualSummaryOptions {
+  /** A draw at or above this amount is a major life event. Default 50_000 ($500). */
+  majorPopUpThresholdCents?: number;
+  /** CONFIRMED life events of the household (see ConfirmedLifeEvent). */
+  confirmedLifeEvents?: ConfirmedLifeEvent[];
+}
+
 export interface BudgetEngineRuntime extends BudgetEngine {
   /** Per-category availability for a month, in category order. */
   categoryAvailable(monthId: string): CategoryAvailable[];
@@ -288,4 +420,14 @@ export interface BudgetEngineRuntime extends BudgetEngine {
    * Thresholds are tunable via options; the states are the contract.
    */
   dangerZone(monthId: string, options?: DangerZoneOptions): DangerZoneReport;
+  /**
+   * Planned-vs-Actual month report (D9): the plan vs what actually happened,
+   * split into saved / popped up / went as planned, with the fund-draw ledger.
+   */
+  plannedVsActual(monthId: string, options?: PvaOptions): PlannedVsActualReport;
+  /**
+   * Annual summary (D9): the year's months aggregated — savings rate,
+   * net-worth trend, major pop-ups, confirmed seasons.
+   */
+  annualSummary(year: number, options?: AnnualSummaryOptions): AnnualSummary;
 }

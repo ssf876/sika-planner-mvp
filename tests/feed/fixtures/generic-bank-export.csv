@@ -1,0 +1,10 @@
+Transaction ID,Date,Description,Amount,Memo,Status
+TXN-9001,2026-09-01,Whole Foods Market,-86.40,Groceries,POSTED
+TXN-9002,2026-09-02,Acme Corp Payroll,2500.00,,POSTED
+TXN-9003,2026-09-03,"City Metro, Downtown","-42.75",Monthly transit pass,PENDING
+TXN-9002,2026-09-02,Acme Corp Payroll,2500.00,,POSTED
+TXN-9004,2026-09-03,Cinema Nouveau,$18.50,,POSTED
+TXN-9005,09/04/2026,Uptown Coffee,-4.95,,POSTED
+TXN-9006,2026-09-05,Corner Bakery,not-a-number,,POSTED
+TXN-9007,2026-13-40,Ghost Payee,-10.00,,POSTED
+TXN-9008,2026-09-07,,-3.25,,POSTED

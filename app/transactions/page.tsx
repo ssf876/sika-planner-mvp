@@ -2,7 +2,10 @@ import Link from "next/link";
 
 import { prisma } from "@/lib/db";
 import { requireOnboardedUser } from "@/lib/auth/session";
+import { deleteCsvMappingAction } from "@/app/actions/csv-import";
+import { listSavedCsvMappings } from "@/lib/repositories/csv-mappings";
 
+import { ImportForm } from "./import-form";
 import { TransactionEntryForm } from "./entry-form";
 import { TransferForm } from "./transfer-form";
 
@@ -21,7 +24,7 @@ export default async function TransactionsPage() {
   const householdId = user.householdId;
   const today = todayCalendarDate();
 
-  const [accounts, categories] = await Promise.all([
+  const [accounts, categories, savedMappings] = await Promise.all([
     prisma.account.findMany({
       where: { householdId },
       orderBy: [{ kind: "asc" }, { name: "asc" }],
@@ -32,6 +35,7 @@ export default async function TransactionsPage() {
       orderBy: [{ group: "asc" }, { name: "asc" }],
       select: { id: true, name: true, group: true },
     }),
+    listSavedCsvMappings(prisma, householdId),
   ]);
 
   return (
@@ -73,6 +77,38 @@ export default async function TransactionsPage() {
               Transfers need two accounts — add another one first.
             </p>
           )}
+        </section>
+
+        <section className="card">
+          <h2>Import a bank export (CSV)</h2>
+          <p className="hint">
+            Map the columns once, preview what will import, then stage it.
+            Importing the same file twice never doubles rows.
+          </p>
+          {accounts.length > 0 ? (
+            <ImportForm accounts={accounts} savedMappings={savedMappings} />
+          ) : (
+            <p className="hint">
+              Add an account on the dashboard before importing.
+            </p>
+          )}
+          {savedMappings.length > 0 ? (
+            <div>
+              <h3>Saved mappings</h3>
+              <ul>
+                {savedMappings.map((saved) => (
+                  <li key={saved.id}>
+                    {saved.name} — {saved.mapping.date}, {saved.mapping.payee},{" "}
+                    {saved.mapping.amount}
+                    <form action={deleteCsvMappingAction}>
+                      <input type="hidden" name="mappingId" value={saved.id} />
+                      <button type="submit">Delete</button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </section>
       </div>
     </main>

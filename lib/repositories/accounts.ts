@@ -119,7 +119,7 @@ export async function deleteAccount(
 }
 
 /** Throws NOT_FOUND unless the account exists inside this household. */
-async function requireOwnedAccount(
+export async function requireOwnedAccount(
   db: Db,
   householdId: string,
   accountId: string,

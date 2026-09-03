@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { parseIncomeToCents } from "@/lib/auth/validate";
+import { parsePlannerProposal } from "@/lib/planner/proposals";
 import { engineErrorMessage } from "@/lib/repositories/errors";
 import {
   assignToCategory,
@@ -77,6 +78,39 @@ export async function copyPreviousMonthAction(
       user.householdId,
       monthId,
     );
+    revalidatePath("/planner");
+    return { ok: true, error: null, ...result };
+  } catch (error) {
+    const handled = domainError(error);
+    if (handled) return handled;
+    throw error;
+  }
+}
+
+/**
+ * Apply one advisor proposal (D6/D12). Runs only on the user's explicit
+ * confirmation — the grid calls this from the proposal row's Apply button —
+ * and the applied line flows through the same engine.assign path as a
+ * manual assignment. The proposal arrives from the client untrusted, so it
+ * is re-validated here before anything touches the ledger.
+ */
+export async function applyProposalAction(
+  monthId: string,
+  rawProposal: unknown,
+): Promise<PlannerActionResult> {
+  const user = await requireOnboardedUser();
+
+  const proposal = parsePlannerProposal(rawProposal);
+  if (!proposal) {
+    return failure("That proposal is no longer valid — refresh the planner.");
+  }
+
+  try {
+    const result = await assignToCategory(prisma, user.householdId, {
+      monthId,
+      categoryId: proposal.categoryId,
+      cents: proposal.suggestedCents,
+    });
     revalidatePath("/planner");
     return { ok: true, error: null, ...result };
   } catch (error) {

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import {
+  applyProposalAction,
   assignCategoryAction,
   copyPreviousMonthAction,
   type PlannerActionResult,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/Table";
 import type { DangerTone } from "@/components/ui/types";
 import { parseIncomeToCents } from "@/lib/auth/validate";
+import type { PlannerProposal } from "@/lib/planner/proposals";
 import { formatCents } from "@/lib/money";
 import type { CategoryAvailable, CategoryGroup } from "@/src/engine";
 
@@ -53,6 +55,7 @@ export interface PlannerViewProps {
   hasPreviousMonth: boolean;
   categories: PlannerCategory[];
   initialAvailability: CategoryAvailable[];
+  proposals: PlannerProposal[];
 }
 
 /** Plain-dollars text for assign inputs; blank for unassigned rows. */
@@ -91,12 +94,14 @@ export function PlannerView({
   hasPreviousMonth,
   categories,
   initialAvailability,
+  proposals: initialProposals,
 }: PlannerViewProps) {
   const [assignments, setAssignments] = useState(() =>
     assignmentsOf(initialAvailability),
   );
   const [availability, setAvailability] = useState(initialAvailability);
   const [drafts, setDrafts] = useState(() => draftsOf(initialAvailability));
+  const [proposals, setProposals] = useState(initialProposals);
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
@@ -149,6 +154,25 @@ export function PlannerView({
       syncFromServer(result.availability);
     } catch (caught) {
       console.error("planner: assign failed", caught);
+      setError(TRANSPORT_ERROR);
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
+  async function handleApply(proposal: PlannerProposal) {
+    setError(null);
+    setBusyKey(`apply:${proposal.id}`);
+    try {
+      const result = await applyProposalAction(monthId, proposal);
+      if (!result.ok || !result.availability) {
+        setError(result.error ?? "That proposal didn't apply — try again.");
+        return;
+      }
+      syncFromServer(result.availability);
+      setProposals((prev) => prev.filter((p) => p.id !== proposal.id));
+    } catch (caught) {
+      console.error("planner: apply failed", caught);
       setError(TRANSPORT_ERROR);
     } finally {
       setBusyKey(null);
@@ -251,11 +275,16 @@ export function PlannerView({
                     const releasedCents = server?.cashflowReleasedCents ?? 0;
                     const draft = parseIncomeToCents(drafts[category.id] ?? "");
                     const assignedNow = draft ?? assignments[category.id] ?? 0;
-                    const availableNow = assignedNow - spentCents + releasedCents;
+                    const availableNow =
+                      assignedNow - spentCents + releasedCents;
                     const tone: DangerTone = classifySpendState(
                       spentCents,
                       assignedNow + releasedCents,
                     );
+                    const proposal = proposals.find(
+                      (p) => p.categoryId === category.id,
+                    );
+                    const applying = busyKey === `apply:${proposal?.id}`;
                     return [
                       <TableRow
                         key={category.id}
@@ -303,6 +332,37 @@ export function PlannerView({
                           ) : null}
                         </TableCell>
                       </TableRow>,
+                      ...(proposal
+                        ? [
+                            // Advisor-proposed rows are display-only until
+                            // Apply: distinct tint, labeled suggestion, and
+                            // the only button that can mutate the ledger.
+                            <TableRow
+                              key={`proposal-${proposal.id}`}
+                              className={styles.proposalRow}
+                            >
+                              <TableCell colSpan={5}>
+                                <div className={styles.proposal}>
+                                  <Badge tone="info">Proposed</Badge>
+                                  <span>
+                                    {proposal.reason ?? "Advisor suggestion"}
+                                  </span>
+                                  <span className="muted">
+                                    Assign{" "}
+                                    {formatCents(proposal.suggestedCents)}
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => void handleApply(proposal)}
+                                    disabled={busyKey !== null}
+                                  >
+                                    {applying ? "Applying…" : "Apply proposal"}
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>,
+                          ]
+                        : []),
                     ];
                   }),
                 ];

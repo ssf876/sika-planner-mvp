@@ -66,5 +66,25 @@
 }
 
 /*
- * Advisor-proposed row styles land with the proposals-display commit.
+ * Advisor-proposed rows (D6/D12): visually distinct from both plain and
+ * danger rows — informational teal tint with a solid left accent — and
+ * display-only until the user applies them.
  */
+.proposalRow td {
+  padding: 0;
+  border-bottom: none;
+}
+
+.proposalRow {
+  background: var(--sp-color-primary-soft);
+  box-shadow: inset 3px 0 0 var(--sp-color-primary);
+}
+
+.proposal {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-space-3);
+  flex-wrap: wrap;
+  padding: var(--sp-space-2) 0;
+  font-size: var(--sp-text-sm);
+}

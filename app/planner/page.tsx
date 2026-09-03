@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { getPlannerSnapshot } from "@/lib/repositories/planner";
+import type { PlannerProposal } from "@/lib/planner/proposals";
 
 import { PlannerView } from "./planner-view";
 
@@ -33,6 +34,12 @@ export default async function PlannerPage() {
     todayCalendarDate(),
   );
 
+  // Advisor seam (D12): the season advisor sources proposals for this
+  // household + month, and the grid renders whatever arrives — applying a
+  // line only through the user's explicit Apply. Until that work lands,
+  // no proposals exist.
+  const proposals: PlannerProposal[] = [];
+
   return (
     <main>
       <header className="topbar">
@@ -46,6 +53,7 @@ export default async function PlannerPage() {
         hasPreviousMonth={snapshot.hasPreviousMonth}
         categories={snapshot.categories}
         initialAvailability={snapshot.availability}
+        proposals={proposals}
       />
     </main>
   );

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PlannerActionResult } from "@/app/actions/planner";
 import { PlannerView } from "@/app/planner/planner-view";
+import type { PlannerProposal } from "@/lib/planner/proposals";
 import type { CategoryAvailable } from "@/src/engine";
 
 const assignCategoryAction = vi.fn<
@@ -16,11 +17,17 @@ const assignCategoryAction = vi.fn<
 const copyPreviousMonthAction = vi.fn<
   (monthId: string) => Promise<PlannerActionResult>
 >(async () => ({ ok: true, error: null }));
+const applyProposalAction = vi.fn<
+  (monthId: string, proposal: unknown) => Promise<PlannerActionResult>
+>(async () => ({ ok: true, error: null }));
+
 vi.mock("@/app/actions/planner", () => ({
   assignCategoryAction: (...args: [string, string, string]) =>
     assignCategoryAction(...args),
   copyPreviousMonthAction: (...args: [string]) =>
     copyPreviousMonthAction(...args),
+  applyProposalAction: (...args: [string, unknown]) =>
+    applyProposalAction(...args),
 }));
 
 const monthId = "month-1";
@@ -47,11 +54,22 @@ const availability: CategoryAvailable[] = [
   },
 ];
 
+const proposals: PlannerProposal[] = [
+  {
+    id: "prop-1",
+    categoryId: "cat-dining",
+    suggestedCents: 7500,
+    reason: "Back-to-school season",
+  },
+];
+
 beforeEach(() => {
   assignCategoryAction.mockClear();
   copyPreviousMonthAction.mockClear();
+  applyProposalAction.mockClear();
   assignCategoryAction.mockResolvedValue({ ok: true, error: null });
   copyPreviousMonthAction.mockResolvedValue({ ok: true, error: null });
+  applyProposalAction.mockResolvedValue({ ok: true, error: null });
 });
 
 function renderPlanner(
@@ -64,6 +82,7 @@ function renderPlanner(
       hasPreviousMonth={true}
       categories={categories}
       initialAvailability={availability}
+      proposals={[]}
       {...overrides}
     />,
   );
@@ -135,6 +154,48 @@ describe("PlannerView", () => {
     if (!dining) throw new Error("Dining row not found");
     expect(dining).not.toHaveClass("overspent");
     expect(within(dining).queryByText("Overspent")).not.toBeInTheDocument();
+  });
+
+  it("renders advisor proposals as distinct rows that mutate nothing until applied", async () => {
+    const user = userEvent.setup();
+    renderPlanner({ proposals });
+
+    const proposalRow = screen.getByText("Proposed").closest("tr");
+    if (!proposalRow) throw new Error("Proposal row not found");
+    expect(proposalRow).toHaveClass("proposalRow");
+    expect(
+      within(proposalRow).getByText("Back-to-school season"),
+    ).toBeInTheDocument();
+    expect(within(proposalRow).getByText("Assign $75.00")).toBeInTheDocument();
+
+    // The gate: nothing has been assigned, no action has run, the ledger is
+    // untouched — the proposal is display-only until Apply is clicked.
+    expect(applyProposalAction).not.toHaveBeenCalled();
+    expect(assignCategoryAction).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Assign Dining Out")).toHaveValue("50.00");
+    expect(screen.getByTestId("ready-to-assign")).toHaveTextContent("$50.00");
+
+    applyProposalAction.mockResolvedValueOnce({
+      ok: true,
+      error: null,
+      readyToAssignCents: 2500,
+      availability: [
+        availability[0],
+        { ...availability[1], assignedCents: 7500, availableCents: 7500 },
+      ],
+    });
+    await user.click(
+      within(proposalRow).getByRole("button", { name: "Apply proposal" }),
+    );
+
+    expect(applyProposalAction).toHaveBeenCalledTimes(1);
+    expect(applyProposalAction).toHaveBeenCalledWith(monthId, proposals[0]);
+
+    // Applied: the proposal row goes away and the grid adopts engine truth
+    // (income 200.00 − groceries 100.00 − dining 75.00 = 25.00).
+    expect(await screen.findByText("$25.00")).toBeInTheDocument();
+    expect(screen.getByTestId("ready-to-assign")).toHaveTextContent("$25.00");
+    expect(screen.queryByText("Proposed")).not.toBeInTheDocument();
   });
 
   it("copies last month's plan and adopts the returned server state", async () => {

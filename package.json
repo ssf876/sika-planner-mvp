@@ -16,26 +16,31 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:generate": "prisma generate"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
+    "next": "15.5.25",
     "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "next": "15.5.25"
+    "react-dom": "19.1.0"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.5.25",
-    "@eslint/eslintrc": "^3",
-    "prettier": "^3",
     "eslint-config-prettier": "^10",
     "eslint-plugin-react-hooks": "^5",
-    "vitest": "^3",
-    "@playwright/test": "^1"
+    "prettier": "^3",
+    "prisma": "^6.19.3",
+    "typescript": "^5",
+    "vitest": "^3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

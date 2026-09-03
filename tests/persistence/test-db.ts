@@ -37,6 +37,7 @@ export const testDb = new PrismaClient();
  * database even though the file shares one throwaway DB.
  */
 export async function resetDatabase(): Promise<void> {
+  await testDb.lifeEvent.deleteMany();
   await testDb.fundDraw.deleteMany();
   await testDb.transaction.deleteMany();
   await testDb.transfer.deleteMany();

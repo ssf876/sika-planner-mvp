@@ -24,8 +24,9 @@ export const EXACT_MATCH_CONFIDENCE = 1;
 export const KEYWORD_MATCH_MAX_CONFIDENCE = 0.8;
 
 /** Lowercase, punctuation runs → single spaces, trimmed: "Whole Foods, Inc."
- * and "whole foods inc" are the same payee. */
-function normalizePayee(payee: string): string {
+ * and "whole foods inc" are the same payee. Shared with the advisor's rule
+ * packs so every detector reads payees through the one normalizer. */
+export function normalizePayee(payee: string): string {
   return payee
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")

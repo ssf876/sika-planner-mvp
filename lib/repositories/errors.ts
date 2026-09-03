@@ -10,7 +10,8 @@ export type RepositoryErrorCode =
   | "INVALID_AMOUNT"
   | "INVALID_TARGET"
   | "CATEGORY_ALREADY_FUNDED"
-  | "INVALID_MAPPING";
+  | "INVALID_MAPPING"
+  | "INVALID_KIND";
 
 export class RepositoryError extends Error {
   readonly code: RepositoryErrorCode;

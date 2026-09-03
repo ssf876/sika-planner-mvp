@@ -1,8 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { DEFAULT_CATEGORIES } from "@/lib/onboarding/seed";
-
-// D10 verification: signup → onboard → scaffolded dashboard (spec art_psxjH3kE).
+// D10/D7 verification: signup → onboard → dashboard (spec art_psxjH3kE).
 // Each test signs up a fresh unique email, so runs are isolated in the shared
 // e2e database without needing a per-run reset.
 const PASSWORD = "correct-horse-battery";
@@ -29,34 +27,26 @@ async function completeOnboarding(page: Page): Promise<void> {
   await page.waitForURL("**/dashboard");
 }
 
-test("signup → onboard → scaffolded dashboard", async ({ page }) => {
+test("signup → onboard → zero-transaction dashboard", async ({ page }) => {
   await signup(page);
   await completeOnboarding(page);
 
-  // Scaffolded month: current calendar month, Ready to Assign = entered income.
-  const monthName = new Date().toLocaleString("en-US", { month: "long" });
+  // D7: with no transactions yet, the dashboard shows the specified empty
+  // state — what will appear here plus a way out to the planner — instead
+  // of the spending-driven sections.
   await expect(
-    page.getByRole("heading", { name: `${monthName} Budget` }),
+    page.getByRole("heading", {
+      name: "Your dashboard fills in as money moves",
+    }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Ready to assign" }),
+    page.getByRole("link", { name: "Plan the month →" }),
+  ).toHaveAttribute("href", "/planner");
+
+  // The Life events card stays available for the zero-history cold start.
+  await expect(
+    page.getByRole("heading", { name: "Life events", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".ready-to-assign")).toHaveText("$5,000.00");
-
-  // Mock-up category sections seeded.
-  for (const group of ["Needs", "Wants", "Savings & Debts", "Investments"]) {
-    await expect(
-      page.getByRole("heading", { name: group, exact: true }),
-    ).toBeVisible();
-  }
-  await expect(page.getByText("Groceries")).toBeVisible();
-
-  // Every seeded category starts $0 assigned (count from the seed source of truth).
-  const assignedRows = page.locator(".category-row");
-  await expect(assignedRows).toHaveCount(
-    Object.values(DEFAULT_CATEGORIES).flat().length,
-  );
-  await expect(assignedRows.first()).toContainText("$0.00 assigned");
 });
 
 test("login returns an onboarded user to their dashboard", async ({ page }) => {
@@ -72,7 +62,9 @@ test("login returns an onboarded user to their dashboard", async ({ page }) => {
   await page.getByRole("button", { name: "Log in" }).click();
   await page.waitForURL("**/dashboard");
   await expect(
-    page.getByRole("heading", { name: "Ready to assign" }),
+    page.getByRole("heading", {
+      name: "Your dashboard fills in as money moves",
+    }),
   ).toBeVisible();
 });
 

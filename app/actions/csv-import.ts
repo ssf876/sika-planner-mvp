@@ -17,44 +17,11 @@ import { CsvFeed } from "@/src/feed/csv-feed";
 import { parseCsv } from "@/src/feed/csv";
 import { applyCsvMapping } from "@/src/feed/mapping";
 import type { CsvColumnMapping, MalformedRow } from "@/src/feed/types";
+import type { CsvImportFormState } from "./csv-import-state";
 
 /** Malformed rows and duplicate reports shown to the user, capped for display. */
 const MALFORMED_REPORT_LIMIT = 50;
 const SAMPLE_ROW_LIMIT = 8;
-
-export interface CsvPreviewRow {
-  date: string;
-  payee: string;
-  amountCents: number;
-  pending: boolean;
-  externalId: string;
-}
-
-export interface CsvImportFormState {
-  stage: "input" | "previewed" | "imported";
-  error: string | null;
-  /** Present once a preview succeeded; hidden fields carry it into apply. */
-  preview?: {
-    sample: CsvPreviewRow[];
-    /** Rows the mapping could not parse, with file row numbers. */
-    malformed: MalformedRow[];
-    validCount: number;
-    duplicateCount: number;
-    csvBase64: string;
-    mappingJson: string;
-  };
-  summary?: {
-    imported: number;
-    skippedDuplicates: number;
-    duplicateExternalIds: string[];
-    malformed: MalformedRow[];
-  };
-}
-
-export const initialCsvImportState: CsvImportFormState = {
-  stage: "input",
-  error: null,
-};
 
 function mappingFromForm(formData: FormData): CsvColumnMapping | null {
   const mapping: CsvColumnMapping = {

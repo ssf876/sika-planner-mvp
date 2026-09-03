@@ -15,7 +15,7 @@ beforeAll(() => {
     });
   };
 });
-import type { CsvImportFormState } from "@/app/actions/csv-import";
+import type { CsvImportFormState } from "@/app/actions/csv-import-state";
 
 const { initialCsvImportState, previewCsvImportAction, applyCsvImportAction } =
   vi.hoisted(() => {

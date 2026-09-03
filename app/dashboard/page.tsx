@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { prisma } from "@/lib/db";
 import { signOutAction } from "@/app/actions/auth";
 import { requireOnboardedUser } from "@/lib/auth/session";
@@ -43,9 +45,12 @@ export default async function DashboardPage() {
     <main>
       <header className="topbar">
         <h1>{month ? `${monthName} Budget` : "Sika Planner"}</h1>
-        <form action={signOutAction}>
-          <button type="submit">Sign out</button>
-        </form>
+        <nav className="topbar-links">
+          <Link href="/transactions">Enter transactions</Link>
+          <form action={signOutAction}>
+            <button type="submit">Sign out</button>
+          </form>
+        </nav>
       </header>
 
       {month ? (

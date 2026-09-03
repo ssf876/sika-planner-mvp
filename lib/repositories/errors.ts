@@ -31,6 +31,8 @@ const ENGINE_ERROR_MESSAGES: Record<string, string> = {
   UNKNOWN_ACCOUNT: "That account doesn't exist for your household.",
   UNKNOWN_CATEGORY: "That category doesn't exist for your household.",
   UNKNOWN_MONTH: "No budget month covers that date.",
+  PREVIOUS_MONTH_MISSING:
+    "There's no previous month to copy — this planner starts fresh.",
   NO_CASH_ACCOUNT: "Add a cash wallet account first.",
   INVALID_DATE: "Enter a valid date.",
   UNKNOWN_FUND: "That fund doesn't exist for your household.",

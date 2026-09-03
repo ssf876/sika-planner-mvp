@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+// Design tokens for the UI primitives (spec D6–D8): pure :root custom
+// properties, imported once at the app root as the module header directs.
+import "@/components/ui/tokens.css";
 
 export const metadata: Metadata = {
   title: "Sika Planner",

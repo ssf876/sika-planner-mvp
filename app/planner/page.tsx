@@ -3,6 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { getPlannerSnapshot } from "@/lib/repositories/planner";
+import { getWindfallContext } from "@/lib/repositories/windfall";
 import type { PlannerProposal } from "@/lib/planner/proposals";
 
 import { PlannerView } from "./planner-view";
@@ -40,6 +41,15 @@ export default async function PlannerPage() {
   // no proposals exist.
   const proposals: PlannerProposal[] = [];
 
+  // D13 advisor surface: the month's income rows, the unexpected-income
+  // detection over them, and the live ranking inputs. The banner re-ranks
+  // client-side on every render, so an edited goal re-ranks immediately.
+  const windfall = await getWindfallContext(
+    prisma,
+    user.householdId,
+    snapshot.monthId,
+  );
+
   return (
     <main>
       <header className="topbar">
@@ -54,6 +64,7 @@ export default async function PlannerPage() {
         categories={snapshot.categories}
         initialAvailability={snapshot.availability}
         proposals={proposals}
+        windfall={windfall}
       />
     </main>
   );

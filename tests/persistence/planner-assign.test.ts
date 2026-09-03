@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import {
   assignToCategory,
+  assignWindfallToCategory,
   copyPreviousMonthPlan,
   getPlannerSnapshot,
 } from "@/lib/repositories/planner";
@@ -46,6 +47,63 @@ async function seedPreviousMonth() {
   });
   return august;
 }
+
+describe("assignWindfallToCategory — windfall lines are deltas (D13)", () => {
+  it("adds the suggestion on top of the draft the month already has", async () => {
+    // Dining Out assigned 150.00 and overspent by 30.50: the windfall line
+    // covers the shortfall instead of replacing the 150.00 draft with it.
+    await assignToCategory(testDb, seeded.householdId, {
+      monthId: seeded.monthId,
+      categoryId: seeded.categoryIds.diningOut,
+      cents: 15000,
+    });
+    await testDb.transaction.create({
+      data: {
+        accountId: seeded.accountIds.credit,
+        categoryId: seeded.categoryIds.diningOut,
+        kind: "EXPENSE",
+        amountCents: -18050,
+        date: new Date("2026-09-10T00:00:00.000Z"),
+        payee: "Apthorp Diner",
+        reviewState: "CONFIRMED",
+      },
+    });
+
+    const result = await assignWindfallToCategory(testDb, seeded.householdId, {
+      monthId: seeded.monthId,
+      categoryId: seeded.categoryIds.diningOut,
+      deltaCents: 3050,
+    });
+
+    const dining = result.availability.find(
+      (a) => a.categoryId === seeded.categoryIds.diningOut,
+    );
+    expect(dining).toMatchObject({
+      assignedCents: 18050,
+      spentCents: 18050,
+      availableCents: 0,
+    });
+  });
+
+  it("assigns from nothing when the category has no draft yet", async () => {
+    const result = await assignWindfallToCategory(testDb, seeded.householdId, {
+      monthId: seeded.monthId,
+      categoryId: seeded.categoryIds.groceries,
+      deltaCents: 25000,
+    });
+
+    const row = await testDb.allocation.findUniqueOrThrow({
+      where: {
+        monthId_categoryId: {
+          monthId: seeded.monthId,
+          categoryId: seeded.categoryIds.groceries,
+        },
+      },
+    });
+    expect(row.assignedCents).toBe(25000);
+    expect(result.readyToAssignCents).toBe(-25000);
+  });
+});
 
 describe("assignToCategory — one assignment through the engine (D6)", () => {
   it("persists the allocation and returns the engine's recomputed view", async () => {

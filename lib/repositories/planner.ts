@@ -15,7 +15,12 @@ import {
   type CategoryGroup,
 } from "@/src/engine";
 
-import { diffEngineStates, loadHouseholdEngineState, persistEngineDelta, type TransactionalDb } from "./engine-state";
+import {
+  diffEngineStates,
+  loadHouseholdEngineState,
+  persistEngineDelta,
+  type TransactionalDb,
+} from "./engine-state";
 import { ensureMonthCovers } from "./transactions";
 
 export interface AssignToCategoryInput {
@@ -23,6 +28,17 @@ export interface AssignToCategoryInput {
   categoryId: string;
   /** Non-negative integer cents; 0 unassigns (engine semantics). */
   cents: number;
+}
+
+export interface AssignWindfallInput {
+  monthId: string;
+  categoryId: string;
+  /**
+   * How much MORE this category should get, not what the draft should
+   * become — windfall lines are deltas (cover the shortfall, toward the
+   * goal), unlike the grid's absolute assignment and D12 season proposals.
+   */
+  deltaCents: number;
 }
 
 export interface PlannerOpResult {
@@ -47,6 +63,47 @@ export async function assignToCategory(
     const engine = createBudgetEngine(before);
 
     engine.assign(input.monthId, input.categoryId, input.cents);
+
+    await persistEngineDelta(
+      tx,
+      householdId,
+      diffEngineStates(before, engine.snapshot()),
+    );
+
+    return {
+      readyToAssignCents: engine.readyToAssignCents(input.monthId),
+      availability: engine.categoryAvailable(input.monthId),
+    };
+  });
+}
+
+/**
+ * Apply one windfall line to a category (D13). Windfall suggestions are
+ * deltas — "cover the shortfall", "toward the goal" — so the line adds to
+ * the draft the month already has instead of replacing it (engine.assign is
+ * set-semantics; the grid and D12 season proposals feed it absolute
+ * amounts, so they keep using assignToCategory).
+ */
+export async function assignWindfallToCategory(
+  db: TransactionalDb,
+  householdId: string,
+  input: AssignWindfallInput,
+): Promise<PlannerOpResult> {
+  return db.$transaction(async (tx) => {
+    const before = await loadHouseholdEngineState(tx, householdId);
+    const engine = createBudgetEngine(before);
+
+    const currentDraftCents =
+      before.allocations.find(
+        (allocation) =>
+          allocation.monthId === input.monthId &&
+          allocation.categoryId === input.categoryId,
+      )?.assignedCents ?? 0;
+    engine.assign(
+      input.monthId,
+      input.categoryId,
+      currentDraftCents + input.deltaCents,
+    );
 
     await persistEngineDelta(
       tx,

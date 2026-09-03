@@ -5,12 +5,9 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { parseWindfallLine } from "@/lib/planner/windfall";
-import {
-  engineErrorMessage,
-  RepositoryError,
-} from "@/lib/repositories/errors";
+import { engineErrorMessage, RepositoryError } from "@/lib/repositories/errors";
 import { contributeToFund } from "@/lib/repositories/funds";
-import { assignToCategory } from "@/lib/repositories/planner";
+import { assignWindfallToCategory } from "@/lib/repositories/planner";
 import type { CategoryAvailable } from "@/src/engine";
 
 export interface WindfallApplyResult {
@@ -74,7 +71,9 @@ export async function applyWindfallLineAction(
       return { ok: true, error: null, fundBalanceCents: balanceCents };
     }
 
-    // Category and goal lines both land as a zero-based assignment.
+    // Category and goal lines both land as a delta on the category's
+    // existing draft: a windfall line says "move this much more here", so
+    // it must never replace money the month already assigned.
     const categoryId =
       line.kind === "goal" ? line.suggestedCategoryId : line.categoryId;
     if (!categoryId) {
@@ -85,10 +84,10 @@ export async function applyWindfallLineAction(
       };
     }
 
-    const result = await assignToCategory(prisma, user.householdId, {
+    const result = await assignWindfallToCategory(prisma, user.householdId, {
       monthId,
       categoryId,
-      cents: line.suggestedCents,
+      deltaCents: line.suggestedCents,
     });
     revalidatePath("/planner");
     return { ok: true, error: null, ...result };

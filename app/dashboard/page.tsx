@@ -47,6 +47,7 @@ export default async function DashboardPage() {
         <h1>{month ? `${monthName} Budget` : "Sika Planner"}</h1>
         <nav className="topbar-links">
           <Link href="/transactions">Enter transactions</Link>
+          <Link href="/funds">Funds &amp; goals</Link>
           <form action={signOutAction}>
             <button type="submit">Sign out</button>
           </form>

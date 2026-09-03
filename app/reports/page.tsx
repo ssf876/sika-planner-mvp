@@ -2,8 +2,12 @@ import Link from "next/link";
 
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
-import { listMonthReport } from "@/lib/repositories/reports";
+import {
+  listAnnualSummary,
+  listMonthReport,
+} from "@/lib/repositories/reports";
 
+import { AnnualSummarySection } from "./annual-summary";
 import { MonthReportSection } from "./month-report";
 
 export const metadata = { title: "Planned vs actual — Sika Planner" };
@@ -48,7 +52,10 @@ export default async function ReportsPage({
   const params = await searchParams;
   const selected = parseMonthParam(params.month) ?? currentMonth();
 
-  const report = await listMonthReport(prisma, user.householdId, selected);
+  const [report, annual] = await Promise.all([
+    listMonthReport(prisma, user.householdId, selected),
+    listAnnualSummary(prisma, user.householdId, selected.year),
+  ]);
   const previous = shiftMonth(selected, -1);
   const next = shiftMonth(selected, 1);
 
@@ -70,6 +77,8 @@ export default async function ReportsPage({
       </header>
 
       <div className="stack">
+        <AnnualSummarySection report={annual} />
+
         {report ? (
           <MonthReportSection report={report} />
         ) : (

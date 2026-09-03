@@ -13,6 +13,9 @@ export type TxKind = "INCOME" | "EXPENSE" | "TRANSFER";
 export type ReviewState =
   "AUTO_ACCEPTED" | "NEEDS_REVIEW" | "CONFIRMED" | "EDITED";
 export type FundKind = "SINKING" | "STATIC";
+// Advisor vocabulary (D11 will hydrate these; the annual summary renders them).
+export type LifeEventKind =
+  "HOME_PURCHASE" | "MOVE" | "WEDDING" | "CHILD" | "CUSTOM";
 export type RiskAppetite = "CAUTIOUS" | "BALANCED" | "AGGRESSIVE";
 
 export interface Account {
@@ -327,6 +330,73 @@ export interface PvaOptions {
   asPlannedBandPercent?: number;
 }
 
+/** One budgeted month's slice of the annual summary. */
+export interface AnnualMonthRow {
+  monthId: string;
+  month: number;
+  label: string;
+  plannedTotalCents: number;
+  incomeReceivedCents: number;
+  poppedUpCents: number;
+  spendingCents: number;
+  netCashflowCents: number;
+  savedCents: number;
+  overspentCents: number;
+  asPlannedPlannedCents: number;
+}
+
+/** Net worth (Σ account balances) as of the last day of one month. */
+export interface NetWorthPoint {
+  month: number;
+  label: string;
+  netWorthCents: number;
+}
+
+/** A fund draw large enough to be a life event in the annual summary. */
+export interface MajorPopUpRow extends PvaDrawRow {
+  monthId: string;
+  monthLabel: string;
+}
+
+/**
+ * Confirmed life events, passed in by the caller: the engine state does not
+ * carry them (they are advisor rows, D11) so the read layer hands them over.
+ */
+export interface ConfirmedLifeEvent {
+  id: string;
+  kind: LifeEventKind;
+  /** Household-local ISO date the season started, when known. */
+  seasonStart?: string;
+}
+
+export interface AnnualSummary {
+  year: number;
+  /**
+   * Net cashflow ÷ inflows (income received + fund draws), as an integer
+   * percent floored toward zero; null for a year with no inflows.
+   */
+  savingsRatePercent: number | null;
+  totalIncomeCents: number;
+  totalPoppedUpCents: number;
+  totalSpendingCents: number;
+  totalSavedCents: number;
+  totalOverspentCents: number;
+  /** Budgeted months of the year, calendar order. */
+  months: AnnualMonthRow[];
+  /** Twelve points, calendar order — months without activity carry the running balance. */
+  netWorthTrend: NetWorthPoint[];
+  /** Draws at or above the major-pop-up threshold, largest first. */
+  majorPopUps: MajorPopUpRow[];
+  /** Confirmed seasons starting in this year, chronological. */
+  confirmedSeasons: ConfirmedLifeEvent[];
+}
+
+export interface AnnualSummaryOptions {
+  /** A draw at or above this amount is a major life event. Default 50_000 ($500). */
+  majorPopUpThresholdCents?: number;
+  /** CONFIRMED life events of the household (see ConfirmedLifeEvent). */
+  confirmedLifeEvents?: ConfirmedLifeEvent[];
+}
 
 export interface BudgetEngineRuntime extends BudgetEngine {
   /** Per-category availability for a month, in category order. */
@@ -355,4 +425,9 @@ export interface BudgetEngineRuntime extends BudgetEngine {
    * split into saved / popped up / went as planned, with the fund-draw ledger.
    */
   plannedVsActual(monthId: string, options?: PvaOptions): PlannedVsActualReport;
+  /**
+   * Annual summary (D9): the year's months aggregated — savings rate,
+   * net-worth trend, major pop-ups, confirmed seasons.
+   */
+  annualSummary(year: number, options?: AnnualSummaryOptions): AnnualSummary;
 }

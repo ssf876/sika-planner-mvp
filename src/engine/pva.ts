@@ -11,9 +11,14 @@
 import { EngineError } from "./errors";
 import { calendarMonth } from "./invariants";
 import type {
+  AnnualMonthRow,
+  AnnualSummary,
+  AnnualSummaryOptions,
   EngineState,
   FundDraw,
+  MajorPopUpRow,
   MonthCashflow,
+  NetWorthPoint,
   PlannedVsActualReport,
   PvaCategoryRow,
   PvaDrawRow,
@@ -22,6 +27,7 @@ import type {
 } from "./types";
 
 export const DEFAULT_AS_PLANNED_BAND_PERCENT = 10;
+export const DEFAULT_MAJOR_POP_UP_CENTS = 50_000;
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June", "July",
@@ -190,6 +196,134 @@ export function buildPlannedVsActual(
     netCashflowCents: cashflow.netCashflowCents,
     categories,
     draws: drawRowsFor(state, monthId),
+  };
+}
+
+/** Last calendar day of the month as ISO "YYYY-MM-DD" (end-of-month cutoffs). */
+export function lastDayOfMonth(year: number, month: number): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const day = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+/**
+ * The annual summary: the year's budgeted months aggregated (savings rate,
+ * saved/overspent/popped-up rollups), the net-worth trend as of each month's
+ * last day, the draws big enough to be life events, and the confirmed
+ * seasons that started this year.
+ */
+export function buildAnnualSummary(
+  state: EngineState,
+  year: number,
+  options: AnnualSummaryOptions = {},
+): AnnualSummary {
+  const thresholdCents =
+    options.majorPopUpThresholdCents ?? DEFAULT_MAJOR_POP_UP_CENTS;
+
+  const months: AnnualMonthRow[] = state.months
+    .filter((m) => m.year === year)
+    .sort((a, b) => a.month - b.month)
+    .map((m) => {
+      const report = buildPlannedVsActual(state, m.id);
+      return {
+        monthId: m.id,
+        month: m.month,
+        label: monthLabelOf(m.year, m.month),
+        plannedTotalCents: report.plannedTotalCents,
+        incomeReceivedCents: report.incomeReceivedCents,
+        poppedUpCents: report.poppedUpTotalCents,
+        spendingCents: report.actualTotalCents,
+        netCashflowCents: report.netCashflowCents,
+        savedCents: report.savedTotalCents,
+        overspentCents: report.overspentTotalCents,
+        asPlannedPlannedCents: report.asPlannedPlannedCents,
+      };
+    });
+
+  const totalIncomeCents = months.reduce(
+    (sum, m) => sum + m.incomeReceivedCents,
+    0,
+  );
+  const totalPoppedUpCents = months.reduce(
+    (sum, m) => sum + m.poppedUpCents,
+    0,
+  );
+  const totalSpendingCents = months.reduce(
+    (sum, m) => sum + m.spendingCents,
+    0,
+  );
+  const totalSavedCents = months.reduce((sum, m) => sum + m.savedCents, 0);
+  const totalOverspentCents = months.reduce(
+    (sum, m) => sum + m.overspentCents,
+    0,
+  );
+
+  // Savings rate on the month-cashflow definition: fund draws count as the
+  // month's inflow (spec money semantics), pop-up spending as outflow.
+  const inflowCents = totalIncomeCents + totalPoppedUpCents;
+  const netCents = inflowCents - totalSpendingCents;
+  const savingsRatePercent =
+    inflowCents > 0 ? Math.floor((netCents * 100) / inflowCents) : null;
+
+  // Net worth = Σ account balances. Starting balances plus every signed
+  // transaction dated through the month's last day; transfers move money
+  // between the household's own accounts, so they never change the total.
+  const startingCents = state.accounts.reduce(
+    (sum, a) => sum + a.startingCents,
+    0,
+  );
+  const netWorthTrend: NetWorthPoint[] = [];
+  for (let month = 1; month <= 12; month++) {
+    const cutoff = lastDayOfMonth(year, month);
+    const txSum = state.transactions
+      .filter((tx) => tx.date <= cutoff)
+      .reduce((sum, tx) => sum + tx.amountCents, 0);
+    netWorthTrend.push({
+      month,
+      label: monthLabelOf(year, month),
+      netWorthCents: startingCents + txSum,
+    });
+  }
+
+  const majorPopUps = state.fundDraws
+    .filter((d) => d.amountCents >= thresholdCents)
+    .map((d) => {
+      const drawMonth = state.months.find((m) => m.id === d.monthId);
+      if (!drawMonth || drawMonth.year !== year) return null;
+      return {
+        ...drawRowFor(state, d),
+        monthId: drawMonth.id,
+        monthLabel: monthLabelOf(drawMonth.year, drawMonth.month),
+      };
+    })
+    .filter((row): row is MajorPopUpRow => row !== null)
+    .sort(
+      (a, b) =>
+        b.amountCents - a.amountCents || a.fundName.localeCompare(b.fundName),
+    );
+
+  const confirmedSeasons = (options.confirmedLifeEvents ?? [])
+    .filter(
+      (event) =>
+        event.seasonStart !== undefined &&
+        calendarMonth(event.seasonStart).year === year,
+    )
+    .sort((a, b) =>
+      (a.seasonStart ?? "") < (b.seasonStart ?? "") ? -1 : 1,
+    );
+
+  return {
+    year,
+    savingsRatePercent,
+    totalIncomeCents,
+    totalPoppedUpCents,
+    totalSpendingCents,
+    totalSavedCents,
+    totalOverspentCents,
+    months,
+    netWorthTrend,
+    majorPopUps,
+    confirmedSeasons,
   };
 }
 

@@ -9,6 +9,8 @@ import type { CategoryGroup } from "@prisma/client";
 import {
   createBudgetEngine,
   monthLabelOf,
+  type AnnualSummary,
+  type ConfirmedLifeEvent,
   type PlannedVsActualReport,
   type PvaCategoryRow,
 } from "@/src/engine";
@@ -65,6 +67,45 @@ export async function listMonthReport(
     label: monthLabelOf(month.year, month.month),
     report,
     categories,
+  };
+}
+
+export interface AnnualReport {
+  year: number;
+  summary: AnnualSummary;
+  netWorthStartCents: number;
+  netWorthEndCents: number;
+}
+
+/**
+ * The annual summary for a calendar year, plus the confirmed life events the
+ * advisor has locked in (engine state doesn't carry them — they are advisor
+ * rows) — so the year's story reads as one artifact.
+ */
+export async function listAnnualSummary(
+  db: Db,
+  householdId: string,
+  year: number,
+): Promise<AnnualReport> {
+  const state = await loadHouseholdEngineState(db, householdId);
+  const engine = createBudgetEngine(state);
+
+  const seasons = await db.lifeEvent.findMany({
+    where: { householdId, status: "CONFIRMED", seasonStart: { not: null } },
+    orderBy: { seasonStart: "asc" },
+  });
+  const confirmedLifeEvents: ConfirmedLifeEvent[] = seasons.map((season) => ({
+    id: season.id,
+    kind: season.kind,
+    seasonStart: season.seasonStart?.toISOString().slice(0, 10),
+  }));
+
+  const summary = engine.annualSummary(year, { confirmedLifeEvents });
+  return {
+    year,
+    summary,
+    netWorthStartCents: summary.netWorthTrend[0].netWorthCents,
+    netWorthEndCents: summary.netWorthTrend[11].netWorthCents,
   };
 }
 

@@ -7,6 +7,8 @@
 
 import type {
   Allocation,
+  AnnualSummary,
+  AnnualSummaryOptions,
   BudgetEngineRuntime,
   CategoryAvailable,
   DangerCategoryState,
@@ -33,6 +35,7 @@ import {
 } from "./danger";
 import { EngineError } from "./errors";
 import {
+  buildAnnualSummary,
   buildPlannedVsActual,
   computeMonthCashflow,
 } from "./pva";
@@ -558,6 +561,11 @@ export function createBudgetEngine(
     options?: PvaOptions,
   ): PlannedVsActualReport => buildPlannedVsActual(state, monthId, options);
 
+  const annualSummary = (
+    year: number,
+    options?: AnnualSummaryOptions,
+  ): AnnualSummary => buildAnnualSummary(state, year, options);
+
   return {
     readyToAssignCents,
     assign,
@@ -576,5 +584,6 @@ export function createBudgetEngine(
     snapshot: (): EngineState => structuredClone(state),
     dangerZone,
     plannedVsActual,
+    annualSummary,
   };
 }

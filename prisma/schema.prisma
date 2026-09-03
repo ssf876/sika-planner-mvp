@@ -98,6 +98,7 @@ model Household {
   lifeEvents         LifeEvent[]
   goals              Goal[]
   users              User[]
+  transfers          Transfer[]
 }
 
 // D10: email + password login, one household per user in v1. householdId stays
@@ -129,6 +130,26 @@ model Account {
   name          String
   startingCents Int
   transactions  Transaction[]
+  transfersOut  Transfer[]   @relation("TransfersOut")
+  transfersIn   Transfer[]   @relation("TransfersIn")
+}
+
+// Two-account money movement — ATM withdrawal (bank → cash), credit-card
+// payment, static-goal settlement. Maps 1:1 to the engine's `Transfer` type
+// (D2): a transfer touches two accounts and zero categories, so it never
+// enters month cashflow or category availability. Ids are engine-generated
+// and persisted as-is; householdId carries the tenancy scope every row keeps.
+model Transfer {
+  id            String    @id
+  householdId   String
+  household     Household @relation(fields: [householdId], references: [id])
+  fromAccountId String
+  fromAccount   Account   @relation("TransfersOut", fields: [fromAccountId], references: [id])
+  toAccountId   String
+  toAccount     Account   @relation("TransfersIn", fields: [toAccountId], references: [id])
+  amountCents   Int // positive: moves out of `fromAccountId` into `toAccountId`
+  date          DateTime
+  payee         String
 }
 
 model Category {

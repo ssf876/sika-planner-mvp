@@ -34,6 +34,8 @@ export interface CsvImportFormState {
     skippedDuplicates: number;
     duplicateExternalIds: string[];
     malformed: MalformedRow[];
+    /** Rows the categorizer auto-accepted (D5, per household setting). */
+    autoAccepted?: number;
   };
 }
 

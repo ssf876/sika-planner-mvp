@@ -178,6 +178,7 @@ export async function applyCsvImportAction(
           0,
           MALFORMED_REPORT_LIMIT,
         ),
+        autoAccepted: summary.autoAccepted,
       },
     };
   } catch (error) {

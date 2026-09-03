@@ -87,10 +87,14 @@ enum GoalKind {
 
 // One household per login in v1 (spec A2).
 model Household {
-  id                 String       @id @default(cuid())
-  name               String
-  riskAppetite       RiskAppetite @default(BALANCED)
-  monthlyIncomeCents Int?
+  id                     String       @id @default(cuid())
+  name                   String
+  riskAppetite           RiskAppetite @default(BALANCED)
+  monthlyIncomeCents     Int?
+  // D5: when on, imports auto-accept suggestions above the confidence
+  // line (> 0.9) instead of queueing them. Off is the honest default —
+  // nothing is categorized without the user seeing it.
+  autoAcceptSuggestions  Boolean      @default(false)
   accounts           Account[]
   categories         Category[]
   funds              Fund[]

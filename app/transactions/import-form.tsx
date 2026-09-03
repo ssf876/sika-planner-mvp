@@ -292,6 +292,11 @@ export function ImportForm({
                   summary.malformed.length === 1 ? "row was" : "rows were"
                 } skipped as unreadable.`
               : ""}
+            {summary.autoAccepted && summary.autoAccepted > 0
+              ? ` ${summary.autoAccepted} ${
+                  summary.autoAccepted === 1 ? "row was" : "rows were"
+                } auto-accepted from your confirmed history.`
+              : ""}
           </p>
           {summary.duplicateExternalIds.length > 0 ? (
             <p className="hint">

@@ -1,0 +1,211 @@
+// Sika Planner — v1 domain model (from the approved spec, art_psxjH3kE).
+//
+// Money is Int cents everywhere (spec A1) — never floats. Dates are
+// household-local calendar dates (A4). SQLite via Prisma; enum support on
+// SQLite requires Prisma >= 6.2.0.
+//
+// Deviations from the spec's abbreviated listing, both Prisma mechanics rather
+// than model changes:
+//   - explicit @relation declarations (the spec lists FK fields and
+//     back-relations in shorthand)
+//   - FundDraw.transactions back-relation (Prisma requires both sides of a
+//     relation; a draw can pay the expense transaction that consumes it)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountKind {
+  CHECKING
+  SAVINGS
+  CREDIT
+  CASH
+  INVESTMENT
+}
+
+// Mock-up sections: Needs, Wants, Debts, Investments
+enum CategoryGroup {
+  NEEDS
+  WANTS
+  SAVINGS_DEBTS
+  INVESTMENTS
+}
+
+enum TxKind {
+  INCOME
+  EXPENSE
+  TRANSFER
+}
+
+// Every transaction carries a review state so auto-categorization stays honest.
+enum ReviewState {
+  AUTO_ACCEPTED
+  NEEDS_REVIEW
+  CONFIRMED
+  EDITED
+}
+
+// sinking = pays pop-ups; static = holds until drawn
+enum FundKind {
+  SINKING
+  STATIC
+}
+
+enum RiskAppetite {
+  CAUTIOUS
+  BALANCED
+  AGGRESSIVE
+}
+
+// Advisor: deterministic rule packs detect these; CUSTOM is user-declared.
+enum LifeEventKind {
+  HOME_PURCHASE
+  MOVE
+  WEDDING
+  CHILD
+  CUSTOM
+}
+
+// CANDIDATE rows are proposals; CONFIRMED rows activate the season template.
+enum LifeEventStatus {
+  CANDIDATE
+  CONFIRMED
+  DISMISSED
+}
+
+// Onboarding seeds the first active goal ("top money goal today" in the mock-up).
+enum GoalKind {
+  PAYOFF_DEBT
+  GROW_NET_WORTH
+  CUSTOM
+}
+
+// One household per login in v1 (spec A2).
+model Household {
+  id                 String       @id @default(cuid())
+  name               String
+  riskAppetite       RiskAppetite @default(BALANCED)
+  monthlyIncomeCents Int?
+  accounts           Account[]
+  categories         Category[]
+  funds              Fund[]
+  months             Month[]
+  lifeEvents         LifeEvent[]
+  goals              Goal[]
+}
+
+model Account {
+  id            String        @id @default(cuid())
+  householdId   String
+  household     Household     @relation(fields: [householdId], references: [id])
+  kind          AccountKind
+  name          String
+  startingCents Int
+  transactions  Transaction[]
+}
+
+model Category {
+  id           String        @id @default(cuid())
+  householdId  String
+  household    Household     @relation(fields: [householdId], references: [id])
+  group        CategoryGroup
+  name         String
+  fundId       String?       @unique
+  fund         Fund?         @relation("CategoryFund", fields: [fundId], references: [id]) // companion fund, when this category is funded by one
+  allocations  Allocation[]
+  transactions Transaction[]
+}
+
+model Month {
+  id                  String       @id @default(cuid())
+  householdId         String
+  household           Household    @relation(fields: [householdId], references: [id])
+  year                Int
+  month               Int // 1-12
+  expectedIncomeCents Int
+  allocations         Allocation[]
+  fundDraws           FundDraw[]
+
+  @@unique([householdId, year, month])
+}
+
+model Allocation {
+  id            String   @id @default(cuid())
+  monthId       String
+  month         Month    @relation(fields: [monthId], references: [id])
+  categoryId    String
+  category      Category @relation(fields: [categoryId], references: [id])
+  assignedCents Int
+
+  @@unique([monthId, categoryId])
+}
+
+model Fund {
+  id           String     @id @default(cuid())
+  householdId  String
+  household    Household  @relation(fields: [householdId], references: [id])
+  kind         FundKind
+  name         String
+  targetCents  Int?
+  targetDate   DateTime?
+  balanceCents Int // contributions - payouts + adjustments
+  draws        FundDraw[]
+  category     Category?  @relation("CategoryFund")
+}
+
+model FundDraw {
+  id           String        @id @default(cuid())
+  fundId       String
+  fund         Fund          @relation(fields: [fundId], references: [id])
+  monthId      String
+  month        Month         @relation(fields: [monthId], references: [id])
+  amountCents  Int // recorded as cashflow income of `monthId`
+  transactions Transaction[] // expense(s) paid by this draw
+}
+
+model Transaction {
+  id          String      @id @default(cuid())
+  accountId   String
+  account     Account     @relation(fields: [accountId], references: [id])
+  categoryId  String?
+  category    Category?   @relation(fields: [categoryId], references: [id])
+  fundDrawId  String?
+  fundDraw    FundDraw?   @relation(fields: [fundDrawId], references: [id])
+  kind        TxKind
+  amountCents Int // signed; positive = money in
+  date        DateTime
+  payee       String
+  note        String?
+  externalId  String? // feed dedupe key
+  pending     Boolean     @default(false)
+  reviewState ReviewState @default(NEEDS_REVIEW)
+
+  @@unique([accountId, externalId])
+}
+
+// Advisor: a detected or declared season of life.
+model LifeEvent {
+  id          String          @id @default(cuid())
+  householdId String
+  household   Household       @relation(fields: [householdId], references: [id])
+  kind        LifeEventKind
+  status      LifeEventStatus @default(CANDIDATE)
+  evidence    String? // human-readable detector summary, e.g. "4 moving-related transactions in 3 weeks"
+  seasonStart DateTime?
+}
+
+// Advisor: goals are data so windfall recommendations re-rank when they change.
+model Goal {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id])
+  kind        GoalKind
+  name        String
+  targetCents Int?
+  active      Boolean   @default(true)
+}

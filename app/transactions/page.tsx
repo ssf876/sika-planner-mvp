@@ -4,9 +4,14 @@ import { prisma } from "@/lib/db";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { deleteCsvMappingAction } from "@/app/actions/csv-import";
 import { listSavedCsvMappings } from "@/lib/repositories/csv-mappings";
+import {
+  getAutoAcceptSuggestions,
+  loadReviewQueue,
+} from "@/lib/repositories/categorizer";
 
 import { ImportForm } from "./import-form";
 import { TransactionEntryForm } from "./entry-form";
+import { ReviewQueue } from "./review-queue";
 import { TransferForm } from "./transfer-form";
 
 export const metadata = { title: "Enter transactions — Sika Planner" };
@@ -24,19 +29,22 @@ export default async function TransactionsPage() {
   const householdId = user.householdId;
   const today = todayCalendarDate();
 
-  const [accounts, categories, savedMappings] = await Promise.all([
-    prisma.account.findMany({
-      where: { householdId },
-      orderBy: [{ kind: "asc" }, { name: "asc" }],
-      select: { id: true, name: true },
-    }),
-    prisma.category.findMany({
-      where: { householdId },
-      orderBy: [{ group: "asc" }, { name: "asc" }],
-      select: { id: true, name: true, group: true },
-    }),
-    listSavedCsvMappings(prisma, householdId),
-  ]);
+  const [accounts, categories, savedMappings, reviewQueue, autoAccept] =
+    await Promise.all([
+      prisma.account.findMany({
+        where: { householdId },
+        orderBy: [{ kind: "asc" }, { name: "asc" }],
+        select: { id: true, name: true },
+      }),
+      prisma.category.findMany({
+        where: { householdId },
+        orderBy: [{ group: "asc" }, { name: "asc" }],
+        select: { id: true, name: true, group: true },
+      }),
+      listSavedCsvMappings(prisma, householdId),
+      loadReviewQueue(prisma, householdId),
+      getAutoAcceptSuggestions(prisma, householdId),
+    ]);
 
   return (
     <main>
@@ -46,6 +54,20 @@ export default async function TransactionsPage() {
       </header>
 
       <div className="stack">
+        <section className="card">
+          <h2>Review queue</h2>
+          <p className="hint">
+            Imported rows waiting for a category, with a suggestion from the
+            ones you confirmed before. Confirm as suggested, or pick another
+            category — either way the categorizer learns.
+          </p>
+          <ReviewQueue
+            rows={reviewQueue}
+            categories={categories}
+            autoAccept={autoAccept}
+          />
+        </section>
+
         <section className="card">
           <h2>Manual entry</h2>
           <p className="hint">

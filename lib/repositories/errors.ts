@@ -11,7 +11,9 @@ export type RepositoryErrorCode =
   | "INVALID_TARGET"
   | "CATEGORY_ALREADY_FUNDED"
   | "INVALID_MAPPING"
-  | "INVALID_KIND";
+  | "INVALID_KIND"
+  | "ALREADY_REVIEWED"
+  | "CATEGORY_REQUIRED";
 
 export class RepositoryError extends Error {
   readonly code: RepositoryErrorCode;

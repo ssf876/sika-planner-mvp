@@ -10,6 +10,7 @@
 
 import type { PrismaClient } from "@prisma/client";
 
+import { loadAutoAcceptGate } from "./categorizer";
 import { requireOwnedAccount } from "./accounts";
 import { calendarDateToDate } from "./engine-state";
 import { ensureMonthCovers } from "./transactions";
@@ -23,6 +24,8 @@ export interface ImportSummary {
   skippedDuplicates: number;
   /** externalIds of rejected duplicates, capped for display. */
   duplicateExternalIds: string[];
+  /** Rows the categorizer auto-accepted (D5, per household setting). */
+  autoAccepted: number;
 }
 
 const DUPLICATE_ID_REPORT_LIMIT = 10;
@@ -69,6 +72,11 @@ export async function importFromFeed(
     return true;
   });
 
+  // The auto-accept gate reads the household setting + confirmed history
+  // once for the whole batch; null when the setting is off (the default).
+  const autoAccept = await loadAutoAcceptGate(db, householdId);
+  let autoAccepted = 0;
+
   if (fresh.length > 0) {
     await db.$transaction(async (tx) => {
       // Scaffold every month the import touches, so the planner and the
@@ -79,17 +87,29 @@ export async function importFromFeed(
       }
 
       await tx.transaction.createMany({
-        data: fresh.map((row) => ({
-          accountId,
-          kind: row.amountCents > 0 ? ("INCOME" as const) : ("EXPENSE" as const),
-          amountCents: row.amountCents,
-          date: calendarDateToDate(row.date),
-          payee: row.payee,
-          note: row.memo ?? null,
-          externalId: row.externalId,
-          pending: row.pending,
-          reviewState: "NEEDS_REVIEW" as const,
-        })),
+        data: fresh.map((row) => {
+          const kind =
+            row.amountCents > 0 ? ("INCOME" as const) : ("EXPENSE" as const);
+          // High-confidence suggestion + setting on: the row lands
+          // AUTO_ACCEPTED with its category (and depletes it), never
+          // silently — the summary reports the count.
+          const suggestion = autoAccept?.(row.payee, kind) ?? null;
+          if (suggestion) autoAccepted += 1;
+          return {
+            accountId,
+            kind,
+            amountCents: row.amountCents,
+            date: calendarDateToDate(row.date),
+            payee: row.payee,
+            note: row.memo ?? null,
+            externalId: row.externalId,
+            pending: row.pending,
+            categoryId: suggestion?.categoryId,
+            reviewState: suggestion
+              ? ("AUTO_ACCEPTED" as const)
+              : ("NEEDS_REVIEW" as const),
+          };
+        }),
       });
     });
   }
@@ -101,5 +121,6 @@ export async function importFromFeed(
       0,
       DUPLICATE_ID_REPORT_LIMIT,
     ),
+    autoAccepted,
   };
 }

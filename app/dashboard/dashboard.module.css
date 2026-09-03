@@ -1,0 +1,111 @@
+/* Layout for the D7 dashboard. Color and surface vocabulary lives in the
+   design tokens (globals.css) and the Card/ProgressBar/Badge primitives —
+   this file only arranges them. */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+}
+
+.metricCard h2 {
+  margin-top: 0;
+}
+
+.metricValue {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0.25rem 0;
+}
+
+.netWorth {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0.25rem 0;
+}
+
+.stripTitle {
+  margin: 0;
+}
+
+/* Five mock-up sections: two columns on desktop, one on narrow screens. */
+.sectionGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.section h2 {
+  margin-top: 0;
+}
+
+.rowList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rowMain {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.rowLabel {
+  display: block;
+  font-weight: 600;
+}
+
+.rowAvailable {
+  margin: 0.15rem 0 0;
+  font-size: 0.875rem;
+}
+
+/* One detected candidate awaiting confirm/dismiss. */
+.candidate {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.candidate p {
+  margin: 0.15rem 0 0;
+}
+
+.candidateActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.declareRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-top: 0.85rem;
+}
+
+.emptyHero {
+  padding: 2rem 1.5rem;
+}
+
+.emptyHero h2 {
+  margin-top: 0;
+}
+
+.emptyLink {
+  font-weight: 600;
+}

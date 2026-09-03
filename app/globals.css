@@ -1,0 +1,230 @@
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --muted: #6b6b6b;
+  --border: #d4d4d4;
+  --accent: #171717;
+  --accent-foreground: #ffffff;
+  --danger: #b91c1c;
+  --card: #f5f5f5;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+    --muted: #a3a3a3;
+    --border: #333333;
+    --accent: #ededed;
+    --accent-foreground: #0a0a0a;
+    --danger: #f87171;
+    --card: #161616;
+  }
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+  line-height: 1.6;
+}
+
+h1 {
+  font-size: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Shared primitives for auth, onboarding, and the scaffolded dashboard */
+
+.stack > * + * {
+  margin-top: 1rem;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  background: var(--card);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.field {
+  display: block;
+}
+
+.field span {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.field input[type="text"],
+.field input[type="email"],
+.field input[type="password"],
+.field input[type="number"] {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.choice input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+button[type="submit"] {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.form-error {
+  color: var(--danger);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.ready-to-assign {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.category-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Funds & goals board (D8) */
+
+.topbar-links {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.radio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.radio input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+.form-success {
+  color: #15803d;
+}
+
+@media (prefers-color-scheme: dark) {
+  .form-success {
+    color: #4ade80;
+  }
+}
+
+.month-strip {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0;
+}
+
+.month-strip span {
+  display: block;
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+
+.month-strip strong {
+  font-size: 1.125rem;
+}
+
+.fund-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.fund-balance {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.draw-list,
+.goal-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.draw-list li {
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.goal-row {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.goal-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.goal-actions {
+  display: flex;
+  gap: 0.5rem;
+}

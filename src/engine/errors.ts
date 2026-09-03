@@ -20,7 +20,8 @@ export type EngineErrorCode =
   | "NO_CASH_ACCOUNT"
   | "SELF_TRANSFER"
   | "PREVIOUS_MONTH_MISSING"
-  | "INVALID_DATE";
+  | "INVALID_DATE"
+  | "INVALID_DANGER_THRESHOLD";
 
 export class EngineError extends Error {
   readonly code: EngineErrorCode;

@@ -12,6 +12,7 @@ export type TxKind = "INCOME" | "EXPENSE" | "TRANSFER";
 export type ReviewState =
   "AUTO_ACCEPTED" | "NEEDS_REVIEW" | "CONFIRMED" | "EDITED";
 export type FundKind = "SINKING" | "STATIC";
+export type RiskAppetite = "CAUTIOUS" | "BALANCED" | "AGGRESSIVE";
 
 export interface Account {
   id: string;
@@ -96,6 +97,8 @@ export interface Transfer {
 
 export interface EngineState {
   householdId: string;
+  /** Household risk posture (mirrors Household.riskAppetite @default(BALANCED)). */
+  riskAppetite?: RiskAppetite;
   accounts: Account[];
   categories: Category[];
   months: BudgetMonth[];
@@ -180,6 +183,89 @@ export interface MonthCashflow {
   netCashflowCents: number;
 }
 
+// ─── Danger zone (spec: "Danger zone is an engine view, not a UI afterthought")
+
+/**
+ * The four danger states are the contract (spec D6): consumers branch on
+ * these, never on thresholds. Severity: overspent > funding-behind > watch.
+ */
+export type DangerState = "healthy" | "watch" | "overspent" | "funding-behind";
+
+/**
+ * Tunable thresholds, as integer percents so all classification math stays
+ * in exact integer arithmetic. Per appetite: CAUTIOUS tightens (warns
+ * earlier), AGGRESSIVE loosens (warns later).
+ */
+export interface DangerZoneThresholds {
+  /**
+   * Watch line as a percent of assigned: a category is on watch when
+   * available ≤ floor(assigned × watchPercent / 100). BALANCED is 10 (spec:
+   * "available ≤ 10% of assigned"); a category needs assigned > 0 to be
+   * watchable at all.
+   */
+  watchPercent: Record<RiskAppetite, number>;
+  /**
+   * Fund-pace slack as a percent of the required monthly pace: a fund is
+   * behind when its month's planned funding × 100 < required ×
+   * paceFloorPercent. CAUTIOUS 100 = the plan must fully cover the pace.
+   */
+  paceFloorPercent: Record<RiskAppetite, number>;
+}
+
+export type DangerZoneThresholdOverrides = {
+  [K in keyof DangerZoneThresholds]?: Partial<DangerZoneThresholds[K]>;
+};
+
+export interface DangerZoneOptions {
+  /** Overrides the household appetite (EngineState.riskAppetite, default BALANCED) for this view. */
+  riskAppetite?: RiskAppetite;
+  /** Per-knob, per-appetite overrides merged over the defaults; percents must be integers 0–100. */
+  thresholds?: DangerZoneThresholdOverrides;
+}
+
+/** Pace facts for one fund with a target and a target date, as of the viewed month. */
+export interface FundPace {
+  fundId: string;
+  /** Cents still needed to reach targetCents (0 once met). */
+  gapCents: number;
+  /** Months of runway including the deadline month; 0 once the target month has passed. */
+  monthsRemaining: number;
+  /** Integer ceil of gap / monthsRemaining. Null when the deadline passed with the target unmet — see overdue. */
+  requiredPerMonthCents: number | null;
+  /** Viewed month's planned funding: the allocation to the fund's companion category. Null when the fund has no companion category. */
+  plannedThisMonthCents: number | null;
+  /** True when the viewed month is past the target month. */
+  overdue: boolean;
+}
+
+export interface FundDangerState {
+  fundId: string;
+  /** Fund-level state — pace only ever makes a fund healthy or funding-behind. */
+  state: Extract<DangerState, "healthy" | "funding-behind">;
+  pace: FundPace;
+}
+
+export interface DangerCategoryState {
+  categoryId: string;
+  state: DangerState;
+  assignedCents: number;
+  availableCents: number;
+  /** available ≤ this line ⇒ watch; null when assigned = 0 (nothing is watchable without a plan). */
+  watchLineCents: number | null;
+  /** Present when the category is backed by a fund with a target and a target date. */
+  fundPace?: FundPace;
+}
+
+export interface DangerZoneReport {
+  monthId: string;
+  riskAppetite: RiskAppetite;
+  /** Worst state across every category and overdue fund — what the dashboard strip shows. */
+  overall: DangerState;
+  categories: DangerCategoryState[];
+  /** Pace facts for every fund with a target and a target date (companion-backed or standalone). */
+  funds: FundDangerState[];
+}
+
 export interface BudgetEngineRuntime extends BudgetEngine {
   /** Per-category availability for a month, in category order. */
   categoryAvailable(monthId: string): CategoryAvailable[];
@@ -196,4 +282,10 @@ export interface BudgetEngineRuntime extends BudgetEngine {
   recordTransfer(input: TransferInput): string;
   /** Deep copy of the current engine state, for the persistence layer to diff/store. */
   snapshot(): EngineState;
+  /**
+   * Danger zone view (D3): per-category and overall states from the
+   * household's riskAppetite, category availability, and fund pace.
+   * Thresholds are tunable via options; the states are the contract.
+   */
+  dangerZone(monthId: string, options?: DangerZoneOptions): DangerZoneReport;
 }

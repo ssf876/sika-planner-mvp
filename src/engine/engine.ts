@@ -9,12 +9,27 @@ import type {
   Allocation,
   BudgetEngineRuntime,
   CategoryAvailable,
+  DangerCategoryState,
+  DangerState,
+  DangerZoneOptions,
+  DangerZoneReport,
   EngineState,
+  FundDangerState,
+  FundPace,
   MonthCashflow,
+  RiskAppetite,
   Transaction,
   TransactionInput,
   TransferInput,
 } from "./types";
+import {
+  assessFundPace,
+  classifyAvailability,
+  computeFundPace,
+  resolveDangerThresholds,
+  watchLineCents,
+  worstDangerState,
+} from "./danger";
 import { EngineError } from "./errors";
 import {
   assertIntegerCents,
@@ -467,6 +482,87 @@ export function createBudgetEngine(
     return drawId;
   };
 
+  // ── danger zone view (D3) ────────────────────────────────────────────────
+
+  const dangerZone = (
+    monthId: string,
+    options?: DangerZoneOptions,
+  ): DangerZoneReport => {
+    const month = requireMonth(monthId);
+    const appetite: RiskAppetite =
+      options?.riskAppetite ?? state.riskAppetite ?? "BALANCED";
+    const thresholds = resolveDangerThresholds(options?.thresholds);
+    const asOf = { year: month.year, month: month.month };
+
+    // Fund pace first: category rows read their companion fund's verdict.
+    const paceByFund = new Map<string, FundPace>();
+    const funds: FundDangerState[] = [];
+    for (const fund of state.funds) {
+      const companion = state.categories.find((c) => c.fundId === fund.id);
+      const planned = companion
+        ? (state.allocations.find(
+            (a) => a.monthId === monthId && a.categoryId === companion.id,
+          )?.assignedCents ?? 0)
+        : null;
+      const pace = computeFundPace(fund, asOf, planned);
+      if (!pace) continue;
+      paceByFund.set(fund.id, pace);
+      funds.push({
+        fundId: fund.id,
+        state: assessFundPace(pace, appetite, thresholds),
+        pace,
+      });
+    }
+
+    let overall: DangerState = "healthy";
+    const categories: DangerCategoryState[] = categoryAvailable(monthId).map(
+      (row) => {
+        const availability = classifyAvailability(
+          row.availableCents,
+          row.assignedCents,
+          appetite,
+          thresholds,
+        );
+        const fundId = state.categories.find(
+          (c) => c.id === row.categoryId,
+        )?.fundId;
+        const pace = fundId ? paceByFund.get(fundId) : undefined;
+        const rowState = pace
+          ? worstDangerState(
+              availability,
+              assessFundPace(pace, appetite, thresholds),
+            )
+          : availability;
+        overall = worstDangerState(overall, rowState);
+        return {
+          categoryId: row.categoryId,
+          state: rowState,
+          assignedCents: row.assignedCents,
+          availableCents: row.availableCents,
+          watchLineCents: watchLineCents(
+            row.assignedCents,
+            appetite,
+            thresholds,
+          ),
+          fundPace: pace,
+        };
+      },
+    );
+    // A standalone fund (no companion category) that blew its deadline is
+    // household-level danger even though no category row carries it.
+    for (const fund of funds) {
+      overall = worstDangerState(overall, fund.state);
+    }
+
+    return {
+      monthId: month.id,
+      riskAppetite: appetite,
+      overall,
+      categories,
+      funds,
+    };
+  };
+
   return {
     readyToAssignCents,
     assign,
@@ -483,5 +579,6 @@ export function createBudgetEngine(
       requireFund(fundId).balanceCents,
     recordTransfer,
     snapshot: (): EngineState => structuredClone(state),
+    dangerZone,
   };
 }

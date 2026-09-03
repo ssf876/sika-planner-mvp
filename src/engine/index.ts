@@ -1,6 +1,15 @@
-// Public surface of the budget engine (D2). The app imports from here only.
+// Public surface of the budget engine (D2 + D3). The app imports from here only.
 export { createBudgetEngine, type EngineDeps } from "./engine";
 export { EngineError, type EngineErrorCode } from "./errors";
+export {
+  assessFundPace,
+  classifyAvailability,
+  computeFundPace,
+  DEFAULT_DANGER_THRESHOLDS,
+  resolveDangerThresholds,
+  watchLineCents,
+  worstDangerState,
+} from "./danger";
 export {
   assertIntegerCents,
   assertPositiveCents,
@@ -18,12 +27,21 @@ export type {
   Category,
   CategoryAvailable,
   CategoryGroup,
+  DangerCategoryState,
+  DangerState,
+  DangerZoneOptions,
+  DangerZoneReport,
+  DangerZoneThresholdOverrides,
+  DangerZoneThresholds,
   EngineState,
   Fund,
+  FundDangerState,
   FundDraw,
   FundKind,
+  FundPace,
   MonthCashflow,
   ReviewState,
+  RiskAppetite,
   Transaction,
   TransactionInput,
   Transfer,

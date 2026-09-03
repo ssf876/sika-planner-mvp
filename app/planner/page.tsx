@@ -3,8 +3,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { getPlannerSnapshot } from "@/lib/repositories/planner";
+import { proposeSeasonPlan } from "@/lib/repositories/life-events";
 import { getWindfallContext } from "@/lib/repositories/windfall";
-import type { PlannerProposal } from "@/lib/planner/proposals";
 
 import { PlannerView } from "./planner-view";
 
@@ -35,11 +35,14 @@ export default async function PlannerPage() {
     todayCalendarDate(),
   );
 
-  // Advisor seam (D12): the season advisor sources proposals for this
-  // household + month, and the grid renders whatever arrives — applying a
-  // line only through the user's explicit Apply. Until that work lands,
-  // no proposals exist.
-  const proposals: PlannerProposal[] = [];
+  // Advisor seam (D12): confirmed life-event seasons become planner
+  // proposals for this month. The grid renders whatever arrives — applying
+  // a line only through the user's explicit Apply on the proposal row.
+  const proposals = await proposeSeasonPlan(
+    prisma,
+    user.householdId,
+    snapshot.monthId,
+  );
 
   // D13 advisor surface: the month's income rows, the unexpected-income
   // detection over them, and the live ranking inputs. The banner re-ranks

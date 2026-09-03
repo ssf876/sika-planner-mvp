@@ -20,6 +20,8 @@ import {
 import { ensureMonthCovers } from "./transactions";
 import { loadHouseholdEngineState, type Db } from "./engine-state";
 
+import { runLifeEventDetection } from "./life-events";
+
 // ─── View model ──────────────────────────────────────────────────────────────
 
 export interface DashboardCategoryRow {
@@ -276,6 +278,11 @@ export async function getDashboardSnapshot(
     funds,
     creditAccounts,
   });
+
+  // Detection pass (D11) before the candidates read: new confirmed
+  // categorizations become Life events card candidates here, so the card is
+  // always current and detection stays idempotent.
+  await runLifeEventDetection(db, householdId, today);
 
   const lifeEvents = await db.lifeEvent.findMany({
     where: { householdId, status: "CANDIDATE" },

@@ -9,4 +9,5 @@ export {
   EXACT_MATCH_CONFIDENCE,
   KEYWORD_MATCH_MAX_CONFIDENCE,
   createCategorizer,
+  normalizePayee,
 } from "./categorizer";

@@ -23,8 +23,11 @@ import {
 import type { DangerTone } from "@/components/ui/types";
 import { parseIncomeToCents } from "@/lib/auth/validate";
 import type { PlannerProposal } from "@/lib/planner/proposals";
+import type { WindfallContext } from "@/lib/repositories/windfall";
 import { formatCents } from "@/lib/money";
 import type { CategoryAvailable, CategoryGroup } from "@/src/engine";
+
+import { WindfallBanner } from "./windfall-banner";
 
 import styles from "./planner.module.css";
 
@@ -56,6 +59,8 @@ export interface PlannerViewProps {
   categories: PlannerCategory[];
   initialAvailability: CategoryAvailable[];
   proposals: PlannerProposal[];
+  /** D13 advisor surface — omitted when the household has no month context. */
+  windfall?: WindfallContext | null;
 }
 
 /** Plain-dollars text for assign inputs; blank for unassigned rows. */
@@ -95,6 +100,7 @@ export function PlannerView({
   categories,
   initialAvailability,
   proposals: initialProposals,
+  windfall,
 }: PlannerViewProps) {
   const [assignments, setAssignments] = useState(() =>
     assignmentsOf(initialAvailability),
@@ -207,6 +213,17 @@ export function PlannerView({
 
   return (
     <div className="stack">
+      {windfall ? (
+        <WindfallBanner
+          monthId={windfall.monthId}
+          incomeRows={windfall.incomeRows}
+          detection={windfall.detection}
+          expectedIncomeCents={windfall.expectedIncomeCents}
+          rankContext={windfall.rankContext}
+          onAvailabilitySync={syncFromServer}
+        />
+      ) : null}
+
       <Card>
         <Card.Body>
           <div className={styles.summaryRow} aria-live="polite">

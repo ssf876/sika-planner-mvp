@@ -1,3 +1,4 @@
+
 // Engine domain types — pure TypeScript, zero DB or framework imports (D2).
 //
 // These mirror the Prisma models/enums in prisma/schema.prisma (the hydration
@@ -266,6 +267,67 @@ export interface DangerZoneReport {
   funds: FundDangerState[];
 }
 
+// ─── Planned vs Actual + annual summary (D9) ───────────────────────────────
+
+/** Where one category's month landed against its plan. */
+export type PvaVerdict = "saved" | "overspent" | "as-planned";
+
+export interface PvaCategoryRow {
+  categoryId: string;
+  /** Assigned for the month (0 when the spending was unplanned). */
+  plannedCents: number;
+  /** All spending charged to the category this month, pop-up draws included. */
+  actualCents: number;
+  /** The pop-up slice of actual: expenses paid by a fund draw. */
+  poppedUpCents: number;
+  /** actual − popped up: the spending the plan itself had to absorb. */
+  ordinarySpentCents: number;
+  /** planned − ordinarySpent; positive = money stayed put. */
+  varianceCents: number;
+  verdict: PvaVerdict;
+}
+
+export interface PvaDrawRow {
+  drawId: string;
+  fundId: string;
+  fundName: string;
+  fundKind: FundKind;
+  amountCents: number;
+  /** True when the draw paid a pop-up expense (sinking funds). */
+  paidExpense: boolean;
+  /** Payee of the pop-up expense, when paidExpense. */
+  expensePayee?: string;
+}
+
+export interface PlannedVsActualReport {
+  monthId: string;
+  /** Σ planned over reported categories (unplanned rows add 0). */
+  plannedTotalCents: number;
+  actualTotalCents: number;
+  /** Unspent planned dollars — the "saved" bucket. */
+  savedTotalCents: number;
+  /** Spending beyond plan — the over-bucket. */
+  overspentTotalCents: number;
+  /** Planned dollars in categories whose ordinary spending tracked the plan. */
+  asPlannedPlannedCents: number;
+  /** All fund draws released this month (sinking pop-ups + static draws). */
+  poppedUpTotalCents: number;
+  incomeReceivedCents: number;
+  netCashflowCents: number;
+  categories: PvaCategoryRow[];
+  draws: PvaDrawRow[];
+}
+
+export interface PvaOptions {
+  /**
+   * |ordinary spent − planned| ≤ floor(planned × band / 100) counts as
+   * as-planned. Default 10 (% of planned) — the same ±10% convention as the
+   * danger-zone watch line. 0 means exact-match only.
+   */
+  asPlannedBandPercent?: number;
+}
+
+
 export interface BudgetEngineRuntime extends BudgetEngine {
   /** Per-category availability for a month, in category order. */
   categoryAvailable(monthId: string): CategoryAvailable[];
@@ -288,4 +350,9 @@ export interface BudgetEngineRuntime extends BudgetEngine {
    * Thresholds are tunable via options; the states are the contract.
    */
   dangerZone(monthId: string, options?: DangerZoneOptions): DangerZoneReport;
+  /**
+   * Planned-vs-Actual month report (D9): the plan vs what actually happened,
+   * split into saved / popped up / went as planned, with the fund-draw ledger.
+   */
+  plannedVsActual(monthId: string, options?: PvaOptions): PlannedVsActualReport;
 }

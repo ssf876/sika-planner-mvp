@@ -17,6 +17,13 @@ export {
   normalizeDate,
   previousCalendarMonth,
 } from "./invariants";
+export {
+  buildPlannedVsActual,
+  computeMonthCashflow,
+  DEFAULT_AS_PLANNED_BAND_PERCENT,
+  drawRowsFor,
+  monthLabelOf,
+} from "./pva";
 export type {
   Account,
   AccountKind,
@@ -40,6 +47,11 @@ export type {
   FundKind,
   FundPace,
   MonthCashflow,
+  PlannedVsActualReport,
+  PvaCategoryRow,
+  PvaDrawRow,
+  PvaOptions,
+  PvaVerdict,
   ReviewState,
   RiskAppetite,
   Transaction,

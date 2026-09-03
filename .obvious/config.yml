@@ -1,0 +1,11 @@
+# .obvious/config.yml — Obvious repo policy for build-something-cool
+#
+# This repository is currently empty (no application code). The settings below
+# were auto-detected from the GitHub repository settings on 2026-09-03 and will
+# be revisited by the next setup run once an application exists.
+
+default_branch: main
+
+# GitHub currently allows merge commits, squash merges, and rebase merges;
+# "merge" (merge commit) is GitHub's default-selected method and is used here.
+merge_method: merge

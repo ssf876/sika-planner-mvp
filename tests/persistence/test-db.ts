@@ -45,6 +45,8 @@ export async function resetDatabase(): Promise<void> {
   await testDb.category.deleteMany();
   await testDb.fund.deleteMany();
   await testDb.account.deleteMany();
+  // Goals are plain household rows with no cascade — clear them first.
+  await testDb.goal.deleteMany();
   await testDb.household.deleteMany();
 }
 

@@ -6,7 +6,10 @@
 export type RepositoryErrorCode =
   | "NOT_FOUND"
   | "INVALID_NAME"
-  | "ACCOUNT_IN_USE";
+  | "ACCOUNT_IN_USE"
+  | "INVALID_AMOUNT"
+  | "INVALID_TARGET"
+  | "CATEGORY_ALREADY_FUNDED";
 
 export class RepositoryError extends Error {
   readonly code: RepositoryErrorCode;
@@ -30,6 +33,17 @@ const ENGINE_ERROR_MESSAGES: Record<string, string> = {
   UNKNOWN_MONTH: "No budget month covers that date.",
   NO_CASH_ACCOUNT: "Add a cash wallet account first.",
   INVALID_DATE: "Enter a valid date.",
+  UNKNOWN_FUND: "That fund doesn't exist for your household.",
+  FUND_KIND_MISMATCH:
+    "That draw doesn't match the fund's type — sinking funds pay pop-ups, static goals move on explicit draws.",
+  COMPANION_CATEGORY_REQUIRED:
+    "This sinking fund has no companion category to post the expense against.",
+  INVALID_EXPENSE_AMOUNT:
+    "Enter the pop-up cost as an amount greater than zero.",
+  CATEGORY_MISMATCH:
+    "A pop-up posts against the fund's own category.",
+  DUPLICATE_EXTERNAL_ID:
+    "That entry was already imported — re-imports are ignored, not applied twice.",
 };
 
 /**

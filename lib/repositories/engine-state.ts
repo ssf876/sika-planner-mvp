@@ -235,6 +235,19 @@ export async function persistEngineDelta(
   householdId: string,
   delta: EngineStateDelta,
 ): Promise<void> {
+  // Fund draws first: a draw's expense transaction carries fundDrawId, so the
+  // draw row must exist before the transaction referencing it.
+  if (delta.fundDrawsToCreate.length > 0) {
+    await db.fundDraw.createMany({
+      data: delta.fundDrawsToCreate.map((d) => ({
+        id: d.id,
+        fundId: d.fundId,
+        monthId: d.monthId,
+        amountCents: d.amountCents,
+      })),
+    });
+  }
+
   if (delta.transactionsToCreate.length > 0) {
     await db.transaction.createMany({
       data: delta.transactionsToCreate.map((t) => ({
@@ -250,17 +263,6 @@ export async function persistEngineDelta(
         externalId: t.externalId ?? null,
         pending: t.pending,
         reviewState: t.reviewState,
-      })),
-    });
-  }
-
-  if (delta.fundDrawsToCreate.length > 0) {
-    await db.fundDraw.createMany({
-      data: delta.fundDrawsToCreate.map((d) => ({
-        id: d.id,
-        fundId: d.fundId,
-        monthId: d.monthId,
-        amountCents: d.amountCents,
       })),
     });
   }

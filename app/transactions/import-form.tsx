@@ -6,10 +6,7 @@ import {
   applyCsvImportAction,
   previewCsvImportAction,
 } from "@/app/actions/csv-import";
-import {
-  initialCsvImportState,
-  type CsvImportFormState,
-} from "@/app/actions/csv-import-state";
+import { initialCsvImportState } from "@/app/actions/csv-import-state";
 import { parseCsv } from "@/src/feed/csv";
 import { suggestMapping } from "@/src/feed/mapping";
 import type { CsvColumnMapping } from "@/src/feed/types";

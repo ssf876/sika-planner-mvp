@@ -16,7 +16,7 @@ import {
 import { CsvFeed } from "@/src/feed/csv-feed";
 import { parseCsv } from "@/src/feed/csv";
 import { applyCsvMapping } from "@/src/feed/mapping";
-import type { CsvColumnMapping, MalformedRow } from "@/src/feed/types";
+import type { CsvColumnMapping } from "@/src/feed/types";
 import type { CsvImportFormState } from "./csv-import-state";
 
 /** Malformed rows and duplicate reports shown to the user, capped for display. */

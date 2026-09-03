@@ -5,10 +5,12 @@
 // Money is integer cents everywhere (spec A1); dates are household-local
 // calendar dates (spec A4), held as ISO "YYYY-MM-DD" strings.
 
-export type AccountKind = "CHECKING" | "SAVINGS" | "CREDIT" | "CASH" | "INVESTMENT";
+export type AccountKind =
+  "CHECKING" | "SAVINGS" | "CREDIT" | "CASH" | "INVESTMENT";
 export type CategoryGroup = "NEEDS" | "WANTS" | "SAVINGS_DEBTS" | "INVESTMENTS";
 export type TxKind = "INCOME" | "EXPENSE" | "TRANSFER";
-export type ReviewState = "AUTO_ACCEPTED" | "NEEDS_REVIEW" | "CONFIRMED" | "EDITED";
+export type ReviewState =
+  "AUTO_ACCEPTED" | "NEEDS_REVIEW" | "CONFIRMED" | "EDITED";
 export type FundKind = "SINKING" | "STATIC";
 
 export interface Account {
@@ -106,7 +108,7 @@ export interface EngineState {
 
 export interface TransactionInput {
   accountId: string;
-  kind: Exclude<TxKind, "TRANSFER"> | "TRANSFER";
+  kind: TxKind;
   /** Signed; positive = money in, negative = money out. */
   amountCents: number;
   date: string | Date;
@@ -150,7 +152,11 @@ export interface BudgetEngine {
   /** Any outflow — card, cash, or check — depletes the category at transaction time. */
   recordTransaction(tx: TransactionInput): CategoryAvailable[];
   /** Bank → wallet move. Touches two accounts, zero categories, zero cashflow. */
-  withdrawToCash(accountId: string, cents: number): string;
+  withdrawToCash(
+    accountId: string,
+    cents: number,
+    date?: string | Date,
+  ): string;
   /**
    * Sinking fund pays a pop-up: fund −, expense posts, month's available cash +
    * (cashflow, never income).

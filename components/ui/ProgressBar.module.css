@@ -1,0 +1,52 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-space-2);
+  font-family: var(--sp-font-sans);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-space-4);
+}
+
+.label {
+  font-size: var(--sp-text-md);
+  font-weight: var(--sp-font-weight-medium);
+  color: var(--sp-color-text);
+}
+
+.amounts {
+  font-size: var(--sp-text-md);
+  color: var(--sp-color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.track {
+  height: 8px;
+  border-radius: var(--sp-radius-full);
+  background: var(--sp-gray-200);
+  overflow: hidden;
+}
+
+.fill {
+  height: 100%;
+  border-radius: var(--sp-radius-full);
+  transition: width var(--sp-duration-normal) var(--sp-ease-standard);
+}
+
+/* Danger vocabulary — the fill carries the tone (healthy / watch / overspent). */
+.healthy .fill {
+  background: var(--sp-color-healthy);
+}
+
+.watch .fill {
+  background: var(--sp-color-watch);
+}
+
+.overspent .fill {
+  background: var(--sp-color-overspent);
+}

@@ -9,7 +9,8 @@ export type RepositoryErrorCode =
   | "ACCOUNT_IN_USE"
   | "INVALID_AMOUNT"
   | "INVALID_TARGET"
-  | "CATEGORY_ALREADY_FUNDED";
+  | "CATEGORY_ALREADY_FUNDED"
+  | "INVALID_MAPPING";
 
 export class RepositoryError extends Error {
   readonly code: RepositoryErrorCode;

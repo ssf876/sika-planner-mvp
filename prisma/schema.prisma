@@ -99,6 +99,7 @@ model Household {
   goals              Goal[]
   users              User[]
   transfers          Transfer[]
+  csvMappings        CsvMapping[]
 }
 
 // D10: email + password login, one household per user in v1. householdId stays
@@ -251,4 +252,18 @@ model Goal {
   name        String
   targetCents Int?
   active      Boolean   @default(true)
+}
+
+// D4: saved CSV column mappings — one per bank export format, so re-uploads
+// skip re-mapping. The mapping is JSON in a String column: SQLite exposes no
+// Json scalar in Prisma, and the shape stays a UI concern, not a query target.
+model CsvMapping {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id])
+  name        String // e.g. "Chase checking export"
+  mapping     String // JSON-serialized CsvColumnMapping
+  createdAt   DateTime  @default(now())
+
+  @@unique([householdId, name])
 }

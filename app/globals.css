@@ -1,12 +1,24 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --muted: #6b6b6b;
+  --border: #d4d4d4;
+  --accent: #171717;
+  --accent-foreground: #ffffff;
+  --danger: #b91c1c;
+  --card: #f5f5f5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --muted: #a3a3a3;
+    --border: #333333;
+    --accent: #ededed;
+    --accent-foreground: #0a0a0a;
+    --danger: #f87171;
+    --card: #161616;
   }
 }
 
@@ -39,4 +51,94 @@ main {
 h1 {
   font-size: 1.75rem;
   margin-bottom: 0.75rem;
+}
+
+/* Shared primitives for auth, onboarding, and the scaffolded dashboard */
+
+.stack > * + * {
+  margin-top: 1rem;
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  background: var(--card);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.field {
+  display: block;
+}
+
+.field span {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.field input[type="text"],
+.field input[type="email"],
+.field input[type="password"],
+.field input[type="number"] {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--foreground);
+  font: inherit;
+}
+
+.choice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+}
+
+.choice input[type="radio"] {
+  accent-color: var(--accent);
+}
+
+button[type="submit"] {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.form-error {
+  color: var(--danger);
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.ready-to-assign {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.category-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--border);
 }

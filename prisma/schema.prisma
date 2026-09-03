@@ -97,6 +97,28 @@ model Household {
   months             Month[]
   lifeEvents         LifeEvent[]
   goals              Goal[]
+  users              User[]
+}
+
+// D10: email + password login, one household per user in v1. householdId stays
+// null between signup and onboarding completion.
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  householdId  String?
+  household    Household? @relation(fields: [householdId], references: [id])
+  sessions     Session[]
+}
+
+// Sessions are opaque: the cookie carries a random token, the row stores its
+// SHA-256 hash so a database leak cannot be replayed as valid sessions.
+model Session {
+  id        String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model Account {

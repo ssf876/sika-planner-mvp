@@ -7,6 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "storybook:build": "storybook build",
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
     "start": "next start",

@@ -13,15 +13,20 @@
 import type { PrismaClient } from "@prisma/client";
 
 import {
+  buildSeasonProposal,
   detectLifeEventCandidates,
   type ConfirmedExpenseRow,
   type DetectableLifeEventKind,
   type LifeEventKind,
   type PriorLifeEventRow,
+  type SeasonProposalCategoryRow,
 } from "@/src/advisor";
 
+import { createBudgetEngine } from "@/src/engine";
+
 import { RepositoryError } from "./errors";
-import type { Db } from "./engine-state";
+import { loadHouseholdEngineState, type Db } from "./engine-state";
+import type { PlannerProposal } from "@/lib/planner/proposals";
 
 /** Review-state values that represent a human categorization decision. */
 const LEARNED_REVIEW_STATES = ["CONFIRMED", "EDITED"] as const;
@@ -182,3 +187,74 @@ export async function declareLifeEvent(
     },
   });
 }
+
+/**
+ * The season advisor's planner op (D12): build planner proposals from the
+ * household's confirmed life events for `monthId`. Computed fresh on every
+ * planner render, mirroring the windfall advisor's never-stored pattern; the
+ * grid renders the lines as proposal rows and applies each through
+ * engine.assign only when the user confirms.
+ *
+ * Events drive proposals by kind — two confirmed events of the same kind
+ * yield one proposal — and when two kinds want the same category, the first
+ * kind (pack order) wins so a category never renders two proposal rows.
+ */
+export async function proposeSeasonPlan(
+  db: Db,
+  householdId: string,
+  monthId: string,
+): Promise<PlannerProposal[]> {
+  const events = await db.lifeEvent.findMany({
+    where: { householdId, status: "CONFIRMED" },
+    select: { kind: true },
+  });
+  if (events.length === 0) return [];
+
+  const state = await loadHouseholdEngineState(db, householdId);
+  const month = state.months.find((m) => m.id === monthId);
+  if (!month) {
+    // The planner scaffolds the month before sourcing proposals (the page
+    // fetches its snapshot first); a missing month here is a caller bug and
+    // should not silently produce proposals for the wrong month.
+    throw new Error(`life-events: month "${monthId}" missing for this household`);
+  }
+  const engine = createBudgetEngine(state);
+
+  const categories: SeasonProposalCategoryRow[] = engine
+    .categoryAvailable(monthId)
+    .map((row) => {
+      const category = state.categories.find((c) => c.id === row.categoryId);
+      return {
+        categoryId: row.categoryId,
+        name: category?.name ?? row.categoryId,
+        group: category?.group ?? "NEEDS",
+        assignedCents: row.assignedCents,
+      };
+    });
+  const readyToAssignCents = engine.readyToAssignCents(monthId);
+
+  const seenKinds = new Set<LifeEventKind>();
+  const linesByCategory = new Map<string, PlannerProposal>();
+  for (const event of events) {
+    if (seenKinds.has(event.kind as LifeEventKind)) continue;
+    seenKinds.add(event.kind as LifeEventKind);
+
+    const proposal = buildSeasonProposal({
+      kind: event.kind as LifeEventKind,
+      categories,
+      readyToAssignCents,
+    });
+    for (const line of proposal.lines) {
+      if (!linesByCategory.has(line.categoryId)) {
+        linesByCategory.set(line.categoryId, {
+          id: line.id,
+          categoryId: line.categoryId,
+          suggestedCents: line.suggestedCents,
+          reason: line.reason,
+        });
+      }
+    }
+  }
+  return [...linesByCategory.values()];
+}
+

@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { RepositoryError } from "@/lib/repositories/errors";
+import { assignToCategory } from "@/lib/repositories/planner";
 import {
   confirmLifeEvent,
   declareLifeEvent,
   dismissLifeEvent,
+  proposeSeasonPlan,
   runLifeEventDetection,
 } from "@/lib/repositories/life-events";
 
@@ -254,3 +256,136 @@ describe("declareLifeEvent — the zero-history declaration", () => {
     expect(created).toHaveLength(0);
   });
 });
+
+describe("proposeSeasonPlan — the planner seam (D12)", () => {
+  it("turns a confirmed event into template proposals over live assignments", async () => {
+    const seed = await seedHousehold("season");
+    await testDb.lifeEvent.create({
+      data: {
+        householdId: seed.householdId,
+        kind: "CHILD",
+        status: "CONFIRMED",
+        evidence: "Declared by you",
+      },
+    });
+
+    const proposals = await proposeSeasonPlan(
+      testDb,
+      seed.householdId,
+      seed.monthId,
+    );
+
+    // Only Groceries exists in the seed household — the other template
+    // lines (Insurance, Savings & Funds) are skipped.
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]).toMatchObject({
+      id: "season:CHILD:" + seed.categoryIds.groceries,
+      categoryId: seed.categoryIds.groceries,
+      suggestedCents: 7_500,
+    });
+    expect(proposals[0]?.reason).toContain("Growing family season");
+  });
+
+  it("returns no proposals when the household has no confirmed seasons", async () => {
+    const seed = await seedHousehold("quiet");
+    const proposals = await proposeSeasonPlan(
+      testDb,
+      seed.householdId,
+      seed.monthId,
+    );
+    expect(proposals).toEqual([]);
+  });
+
+  it("never proposes from another household's confirmed seasons", async () => {
+    const seed = await seedHousehold("mine");
+    const other = await seedHousehold("theirs");
+    await testDb.lifeEvent.create({
+      data: {
+        householdId: other.householdId,
+        kind: "MOVE",
+        status: "CONFIRMED",
+        evidence: "theirs",
+      },
+    });
+
+    const proposals = await proposeSeasonPlan(
+      testDb,
+      seed.householdId,
+      seed.monthId,
+    );
+    expect(proposals).toEqual([]);
+  });
+
+  it("applies proposal lines through the engine assign path, exactly as suggested", async () => {
+    const seed = await seedHousehold("apply");
+    await testDb.lifeEvent.create({
+      data: {
+        householdId: seed.householdId,
+        kind: "CHILD",
+        status: "CONFIRMED",
+        evidence: "Declared by you",
+      },
+    });
+
+    const proposals = await proposeSeasonPlan(
+      testDb,
+      seed.householdId,
+      seed.monthId,
+    );
+    const line = proposals[0];
+    expect(line).toBeDefined();
+
+    // The apply path is the same assignToCategory the planner grid uses
+    // (applyProposalAction wraps it) — engine.assign replaces the total.
+    const result = await assignToCategory(testDb, seed.householdId, {
+      monthId: seed.monthId,
+      categoryId: line!.categoryId,
+      cents: line!.suggestedCents,
+    });
+
+    const applied = result.availability.find(
+      (row) => row.categoryId === seed.categoryIds.groceries,
+    );
+    expect(applied?.assignedCents).toBe(7_500);
+  });
+
+  it("suggests reallocations from a tight month's discretionary categories", async () => {
+    const seed = await seedHousehold("tight");
+    await testDb.lifeEvent.create({
+      data: {
+        householdId: seed.householdId,
+        kind: "CHILD",
+        status: "CONFIRMED",
+        evidence: "Declared by you",
+      },
+    });
+    // A zero-based month: 3,950.00 of the 4,000.00 income is already
+    // assigned, so Ready to Assign (500) cannot cover the 7,500 target.
+    await assignToCategory(testDb, seed.householdId, {
+      monthId: seed.monthId,
+      categoryId: seed.categoryIds.groceries,
+      cents: 395_000,
+    });
+    await assignToCategory(testDb, seed.householdId, {
+      monthId: seed.monthId,
+      categoryId: seed.categoryIds.diningOut,
+      cents: 30_000,
+    });
+
+    const proposals = await proposeSeasonPlan(
+      testDb,
+      seed.householdId,
+      seed.monthId,
+    );
+
+    const groceries = proposals.find(
+      (line) => line.categoryId === seed.categoryIds.groceries,
+    );
+    const diningOut = proposals.find(
+      (line) => line.categoryId === seed.categoryIds.diningOut,
+    );
+    expect(groceries).toMatchObject({ suggestedCents: 402_500 }); // 395,000 + 7,500
+    expect(diningOut).toMatchObject({ suggestedCents: 22_500 }); // 30,000 − 7,500 freed
+  });
+});
+

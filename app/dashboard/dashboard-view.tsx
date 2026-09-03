@@ -82,10 +82,14 @@ function DangerStrip({ danger }: { danger: DashboardSnapshot["danger"] }) {
 function BudgetCard({ snapshot }: { snapshot: DashboardSnapshot }) {
   return (
     <Card className={styles.metricCard}>
+      {/* Mock-up grammar: "April Budget — $2,500 spent of $5,500". */}
       <ProgressBar
-        label={`${snapshot.monthLabel} budget`}
+        label={`${snapshot.monthLabel} budget — ${formatCents(
+          snapshot.budget.spentCents,
+        )} spent of ${formatCents(snapshot.budget.assignedCents)}`}
         value={snapshot.budget.spentCents}
         max={snapshot.budget.assignedCents}
+        hideAmounts
       />
       <p className="muted">
         Ready to assign{" "}

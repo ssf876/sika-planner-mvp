@@ -84,12 +84,14 @@ test("the month loop: signup → assign → import → review → spend → dang
   const email = await signup(page);
   await completeOnboarding(page);
 
-  // The zero-transaction dashboard shows the specified empty state (D7).
+  // The zero-transaction dashboard keeps the product's structure (v1.1):
+  // a hero naming the amount ready to plan, the one CTA, quiet empties.
+  const hero = page.getByTestId("hero");
+  await expect(hero).toHaveAttribute("data-empty", "");
+  await expect(page.getByTestId("ready-to-plan")).toHaveText("$5,000.00");
   await expect(
-    page.getByRole("heading", {
-      name: "Your dashboard fills in as money moves",
-    }),
-  ).toBeVisible();
+    hero.getByRole("link", { name: "Plan the month" }),
+  ).toHaveAttribute("href", "/planner");
   // Accounts first: nothing else in the flow works without them.
   await seedAccountsFor(email);
 
@@ -240,29 +242,34 @@ test("the month loop: signup → assign → import → review → spend → dang
 
   // ── danger zone: the credit overspend surfaces (D3/D7) ───────────────────
   await page.goto("/dashboard");
-  const strip = page.getByTestId("danger-strip");
-  await expect(strip).toContainText("Overspent");
-  await expect(strip).toContainText("1 category has spent past the plan");
-  await expect(
-    page.getByText(
-      `${currentMonthLabel()} budget — $685.10 spent of $5,000.00`,
-    ),
-  ).toBeVisible();
-  await expect(page.getByTestId("income-line")).toHaveText(
-    "$5,000.00 received of $5,000.00 expected",
+  // The hero reads money left and the spent-of-planned supporting line.
+  await expect(page.getByTestId("money-left")).toHaveText("$4,314.90");
+  await expect(page.getByTestId("spent-of-planned")).toHaveText(
+    "$685.10 spent of $5,000.00 planned",
   );
-  // 1200 checking + 5000 in − 76.25 − 240 − 60 − 52.10 − 76.25 − 100 out,
-  // −180.50 on credit, +100 in the cash wallet.
-  await expect(page.getByTestId("net-worth")).toHaveText("$5,554.90");
+  // The overspent plan earns the Attention card — no alert-strip chrome.
+  const attention = page.getByTestId("attention");
+  await expect(attention).toContainText(
+    "Sika found something that needs attention.",
+  );
   await expect(
-    page
-      .locator("li", { has: page.getByText("Dining Out", { exact: true }) })
-      .getByText("Overspent"),
-  ).toBeVisible();
+    attention.getByRole("link", {
+      name: "Move money to cover it in the planner",
+    }),
+  ).toHaveAttribute("href", "/planner");
+  // Dining Out spent $180.50 of a $150.00 plan → the row states the overage.
+  const diningPlanRow = page.locator("li", {
+    has: page.getByText("Dining Out", { exact: true }),
+  });
+  await expect(diningPlanRow).toHaveAttribute("data-state", "overspent");
+  await expect(diningPlanRow).toContainText("$30.50 over");
+  await expect(page.getByTestId("net-worth")).toHaveCount(0);
+  await expect(page.getByTestId("income-line")).toHaveCount(0);
 
   // Detection: two confirmed moving-related rows in the window → a candidate
   // with human-readable evidence, waiting on the confirmation gate (D11).
-  const lifeCard = page.getByTestId("life-events-card");
+  // The candidate lives inside the Attention card now, not a standalone card.
+  const lifeCard = page.getByTestId("life-events");
   const candidate = lifeCard.locator("li", { hasText: "Move" });
   await expect(candidate).toContainText(
     "moving-related transactions in 30 days",
@@ -320,11 +327,16 @@ test("the month loop: signup → assign → import → review → spend → dang
 
   // ── season: confirm the detected move, apply its proposal (D11/D12) ──────
   await page.goto("/dashboard");
-  await lifeCard
+  await page
+    .getByTestId("life-events")
     .locator("li", { hasText: "Move" })
     .getByRole("button", { name: "Confirm" })
     .click();
-  await expect(lifeCard.getByTestId("life-events-empty")).toBeVisible();
+  // Confirmed candidates leave the attention area quietly — no empty-state
+  // block renders once nothing needs a decision.
+  await expect(
+    page.getByTestId("life-events").locator("li", { hasText: "Move" }),
+  ).toHaveCount(0);
 
   await page.goto("/planner");
   await expect(page.getByText("Proposed", { exact: true })).toHaveCount(3);

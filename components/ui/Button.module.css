@@ -5,7 +5,7 @@
   gap: var(--sp-space-2);
   border: 1px solid transparent;
   border-radius: var(--sp-radius-md);
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-ui);
   font-weight: var(--sp-font-weight-semibold);
   line-height: 1;
   cursor: pointer;
@@ -48,13 +48,13 @@
 }
 
 .secondary {
-  background: var(--sp-color-surface);
+  background: transparent;
   border-color: var(--sp-color-border-strong);
   color: var(--sp-color-text);
 }
 
 .secondary:hover:not(:disabled) {
-  background: var(--sp-color-bg);
+  background: var(--sp-color-hover);
 }
 
 .ghost {
@@ -72,7 +72,7 @@
 }
 
 .danger:hover:not(:disabled) {
-  background: #7f1d1d;
+  background: var(--sp-color-overspent-hover);
 }
 
 .fullWidth {

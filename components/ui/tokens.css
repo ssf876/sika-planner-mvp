@@ -1,7 +1,20 @@
 /*
  * Sika Planner design tokens — the single source of truth for the visual
- * language (spec D6–D8). Import once at the app root; every primitive and
- * feature screen reads these custom properties.
+ * language (v1.1 warm-editorial system). Imported once at the app root; the
+ * shared shell, every base primitive, and feature screens read these custom
+ * properties. No other file may define a color, font, radius, or shadow.
+ *
+ * The v1.1 palette is warm and paper-like: espresso ink on cream, terracotta
+ * as the working accent, taupe for quiet structure. Semantic danger colors
+ * (healthy / watch / overspent) are muted warm tints that keep clearly
+ * distinct hues from the brand colors — they must never collapse into
+ * espresso or terracotta.
+ *
+ * Typography is a two-family system loaded via next/font in app/layout.tsx:
+ * Fraunces (--font-fraunces) for display moments only — hero financial
+ * values, page titles, important editorial headings. Manrope
+ * (--font-manrope) for everything dense and readable — navigation, forms,
+ * tables, body copy, transaction lists.
  *
  * Desktop-first grammar: base dimensions below target >=1024px viewports.
  * To adapt downward, feature work writes max-width media queries against
@@ -12,38 +25,31 @@
  */
 
 :root {
-  /* ---------- color primitives ---------- */
-  --sp-gray-0: #ffffff;
-  --sp-gray-50: #f8f9fb;
-  --sp-gray-100: #f1f3f6;
-  --sp-gray-200: #e5e8ee;
-  --sp-gray-300: #d3d8e0;
-  --sp-gray-400: #9aa3b2;
-  --sp-gray-500: #6b7484;
-  --sp-gray-600: #4a5364;
-  --sp-gray-700: #333b4a;
-  --sp-gray-800: #1f2633;
-  --sp-gray-900: #121824;
+  /* ---------- brand color primitives ---------- */
+  --sp-espresso: #221807;
+  --sp-bone: #faecd4;
+  --sp-terracotta: #bc6e4e;
+  --sp-taupe: #ad9165;
 
-  --sp-teal-50: #f0fdfa;
-  --sp-teal-100: #ccfbf1;
-  --sp-teal-600: #0d9488;
-  --sp-teal-700: #0f766e;
-  --sp-teal-800: #115e59;
+  /* ---------- surfaces and ink ---------- */
+  --sp-color-bg: #fcf8f1;
+  --sp-color-surface: #fffdf8;
+  --sp-color-border: #e7ded0;
+  --sp-color-border-strong: #d9cbb2;
+  --sp-color-text: var(--sp-espresso);
+  --sp-color-text-muted: #756b5d;
+  --sp-color-text-contrast: var(--sp-bone);
 
-  /* ---------- semantic colors ---------- */
-  --sp-color-bg: var(--sp-gray-50);
-  --sp-color-surface: var(--sp-gray-0);
-  --sp-color-border: var(--sp-gray-300);
-  --sp-color-border-strong: var(--sp-gray-400);
-  --sp-color-text: var(--sp-gray-900);
-  --sp-color-text-muted: var(--sp-gray-500);
-  --sp-color-text-contrast: var(--sp-gray-0);
-
-  --sp-color-primary: var(--sp-teal-700);
-  --sp-color-primary-hover: var(--sp-teal-800);
-  --sp-color-primary-soft: var(--sp-teal-50);
-  --sp-color-focus-ring: rgba(15, 118, 110, 0.35);
+  /* ---------- interactive accents ---------- */
+  --sp-color-primary: var(--sp-espresso);
+  --sp-color-primary-hover: #3a2b12;
+  --sp-color-primary-soft: #f3ead9;
+  --sp-color-accent: var(--sp-terracotta);
+  --sp-color-accent-soft: #f6e7de;
+  --sp-color-accent-ink: #8f4f35;
+  --sp-color-accent-border: #ecd0c0;
+  --sp-color-hover: #f6efe2;
+  --sp-color-focus-ring: rgba(188, 110, 78, 0.4);
 
   /*
    * Danger-state vocabulary — exactly three tones shared by every
@@ -51,39 +57,66 @@
    * Each tone ships a foreground, soft background, and border so badges,
    * cards, progress fills, and table rows read consistently.
    */
-  --sp-color-healthy: #166534;
-  --sp-color-healthy-soft: #f0fdf4;
-  --sp-color-healthy-border: #bbf7d0;
+  --sp-color-healthy: #4a7c59;
+  --sp-color-healthy-soft: #eef4ec;
+  --sp-color-healthy-border: #cfdccd;
 
-  --sp-color-watch: #92400e;
-  --sp-color-watch-soft: #fffbeb;
-  --sp-color-watch-border: #fde68a;
+  --sp-color-watch: #a17428;
+  --sp-color-watch-soft: #f9f1e0;
+  --sp-color-watch-border: #ecd9ae;
 
-  --sp-color-overspent: #991b1b;
-  --sp-color-overspent-soft: #fef2f2;
-  --sp-color-overspent-border: #fecaca;
+  --sp-color-overspent: #a03b31;
+  --sp-color-overspent-hover: #872f26;
+  --sp-color-overspent-soft: #f9ecea;
+  --sp-color-overspent-border: #e6c4bf;
 
   /* ---------- typography ---------- */
-  --sp-font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
 
-  --sp-text-xs: 0.75rem; /* 12px */
-  --sp-text-sm: 0.8125rem; /* 13px */
-  --sp-text-md: 0.875rem; /* 14px */
-  --sp-text-base: 1rem; /* 16px */
-  --sp-text-lg: 1.125rem; /* 18px */
-  --sp-text-xl: 1.25rem; /* 20px */
-  --sp-text-2xl: 1.5rem; /* 24px */
-  --sp-text-3xl: 1.875rem; /* 30px */
+  /* Display face — reserved for hero financial values, page titles, and
+     important editorial headings. Never dense tables, form controls,
+     navigation, body copy, or transaction lists. */
+  --sp-font-display:
+    var(--font-fraunces), "Iowan Old Style", Georgia, "Times New Roman",
+    serif;
 
-  --sp-leading-tight: 1.25;
+  /* Interface face — all dense and readable UI. */
+  --sp-font-ui:
+    var(--font-manrope), system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", sans-serif;
+
+  /* Bridge alias for screens not yet migrated off the v1 name. */
+  --sp-font-sans: var(--sp-font-ui);
+
+  /* Type steps. Hero floats with the viewport; the rest are fixed. */
+  --sp-text-hero: clamp(2.75rem, 2rem + 2.4vw, 3.75rem);
+  --sp-text-page-title: 1.875rem;
+  --sp-text-section-title: 1.3125rem;
+  --sp-text-body: 1rem;
+  --sp-text-label: 0.8125rem;
+  --sp-text-caption: 0.75rem;
+
+  /* Dense-size steps for controls, tables, and forms. */
+  --sp-text-xs: 0.75rem;
+  --sp-text-sm: 0.875rem;
+  --sp-text-md: 0.9375rem;
+  --sp-text-lg: 1.125rem;
+
+  /* Bridge for screens not yet migrated off the v1 scale (planner hero). */
+  --sp-text-3xl: clamp(1.875rem, 1.5rem + 1.2vw, 2.375rem);
+
+  --sp-leading-tight: 1.15;
   --sp-leading-normal: 1.5;
 
   --sp-font-weight-regular: 400;
   --sp-font-weight-medium: 500;
   --sp-font-weight-semibold: 600;
   --sp-font-weight-bold: 700;
+
+  /* Display typography runs a touch lighter than UI semibold. */
+  --sp-font-weight-display: 500;
+
+  /* Money and other tabular figures line up in every dense list. */
+  --sp-numeric: tabular-nums;
 
   /* ---------- spacing (4px base) ---------- */
   --sp-space-1: 4px;
@@ -97,16 +130,16 @@
   --sp-space-12: 48px;
   --sp-space-16: 64px;
 
-  /* ---------- radii ---------- */
-  --sp-radius-sm: 6px;
+  /* ---------- radii (controls sit at 8–10px) ---------- */
+  --sp-radius-sm: 8px;
   --sp-radius-md: 10px;
-  --sp-radius-lg: 14px;
+  --sp-radius-lg: 12px;
   --sp-radius-full: 9999px;
 
-  /* ---------- elevation ---------- */
-  --sp-shadow-sm: 0 1px 2px rgba(18, 24, 36, 0.06);
-  --sp-shadow-md: 0 4px 12px rgba(18, 24, 36, 0.08);
-  --sp-shadow-lg: 0 12px 32px rgba(18, 24, 36, 0.12);
+  /* ---------- elevation (warm-tinted) ---------- */
+  --sp-shadow-sm: 0 1px 2px rgba(34, 24, 7, 0.05);
+  --sp-shadow-md: 0 4px 12px rgba(34, 24, 7, 0.08);
+  --sp-shadow-lg: 0 12px 32px rgba(34, 24, 7, 0.12);
 
   /* ---------- motion ---------- */
   --sp-duration-fast: 120ms;
@@ -115,7 +148,7 @@
 
   /* ---------- desktop-first layout grammar ---------- */
   --sp-container-max: 1240px;
-  --sp-sidebar-width: 264px;
+  --sp-shell-height: 68px;
   --sp-page-padding: 32px;
   --sp-section-gap: 40px;
   --sp-card-padding: 24px;

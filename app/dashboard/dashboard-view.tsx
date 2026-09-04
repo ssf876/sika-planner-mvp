@@ -195,7 +195,6 @@ function SectionCard({ section }: { section: DashboardSection }) {
                   · {fund.kind === "SINKING" ? "sinking fund" : "static goal"}
                 </p>
               </div>
-              <Link href="/funds">Open</Link>
             </li>
           ))}
           {section.debts?.map((debt) => (

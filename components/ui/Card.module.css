@@ -4,7 +4,7 @@
   border-radius: var(--sp-radius-lg);
   box-shadow: var(--sp-shadow-sm);
   padding: var(--sp-card-padding);
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-ui);
 }
 
 .header {

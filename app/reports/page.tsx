@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AppShell } from "@/components/shell/AppShell";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import {
@@ -60,22 +61,28 @@ export default async function ReportsPage({
   const next = shiftMonth(selected, 1);
 
   return (
-    <main>
-      <header className="topbar">
-        <h1>Planned vs actual</h1>
-        <nav className="topbar-links">
-          <Link href={`/reports?month=${monthParam(previous)}`}>
+    <AppShell
+      title="Planned vs actual"
+      email={user.email}
+      titleActions={
+        <nav className="topbar-links" aria-label="Report month">
+          <Link
+            href={`/reports?month=${monthParam(previous)}`}
+            className="title-action"
+          >
             ‹ {previous.year === selected.year ? "" : `${previous.year} `}
             Previous
           </Link>
-          <Link href={`/reports?month=${monthParam(next)}`}>
+          <Link
+            href={`/reports?month=${monthParam(next)}`}
+            className="title-action"
+          >
             Next
             {next.year === selected.year ? "" : ` ${next.year}`} ›
           </Link>
-          <Link href="/dashboard">Back to dashboard</Link>
         </nav>
-      </header>
-
+      }
+    >
       <div className="stack">
         <AnnualSummarySection report={annual} />
 
@@ -94,6 +101,6 @@ export default async function ReportsPage({
           </section>
         )}
       </div>
-    </main>
+    </AppShell>
   );
 }

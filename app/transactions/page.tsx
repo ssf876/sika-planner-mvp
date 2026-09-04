@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { AppShell } from "@/components/shell/AppShell";
 import { prisma } from "@/lib/db";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { deleteCsvMappingAction } from "@/app/actions/csv-import";
@@ -47,12 +46,7 @@ export default async function TransactionsPage() {
     ]);
 
   return (
-    <main>
-      <header className="topbar">
-        <h1>Enter transactions</h1>
-        <Link href="/dashboard">Back to dashboard</Link>
-      </header>
-
+    <AppShell active="activity" title="Activity" email={user.email}>
       <div className="stack">
         <section className="card">
           <h2>Review queue</h2>
@@ -133,6 +127,6 @@ export default async function TransactionsPage() {
           ) : null}
         </section>
       </div>
-    </main>
+    </AppShell>
   );
 }

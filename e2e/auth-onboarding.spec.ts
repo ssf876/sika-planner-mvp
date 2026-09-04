@@ -53,7 +53,8 @@ test("login returns an onboarded user to their dashboard", async ({ page }) => {
   const email = await signup(page);
   await completeOnboarding(page);
 
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
   await page.waitForURL("/");
 
   await page.goto("/login");

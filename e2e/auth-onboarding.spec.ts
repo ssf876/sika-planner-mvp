@@ -31,22 +31,19 @@ test("signup → onboard → zero-transaction dashboard", async ({ page }) => {
   await signup(page);
   await completeOnboarding(page);
 
-  // D7: with no transactions yet, the dashboard shows the specified empty
-  // state — what will appear here plus a way out to the planner — instead
-  // of the spending-driven sections.
+  // v1.1: with no transactions yet the dashboard keeps the product's
+  // structure — a hero that names the amount ready to plan, the one CTA,
+  // and quiet plan/activity empties. No giant instructional card.
+  const hero = page.getByTestId("hero");
+  await expect(hero).toBeVisible();
+  await expect(hero).toHaveAttribute("data-empty", "");
+  await expect(page.getByTestId("ready-to-plan")).toHaveText("$5,000.00");
   await expect(
-    page.getByRole("heading", {
-      name: "Your dashboard fills in as money moves",
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: "Plan the month →" }),
+    hero.getByRole("link", { name: "Plan the month" }),
   ).toHaveAttribute("href", "/planner");
-
-  // The Life events card stays available for the zero-history cold start.
-  await expect(
-    page.getByRole("heading", { name: "Life events", exact: true }),
-  ).toBeVisible();
+  await expect(page.getByTestId("plan-group-needs")).toBeVisible();
+  await expect(page.getByTestId("activity-empty")).toBeVisible();
+  await expect(page.getByTestId("attention")).toHaveCount(0);
 });
 
 test("login returns an onboarded user to their dashboard", async ({ page }) => {
@@ -62,11 +59,10 @@ test("login returns an onboarded user to their dashboard", async ({ page }) => {
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Log in" }).click();
   await page.waitForURL("**/dashboard");
-  await expect(
-    page.getByRole("heading", {
-      name: "Your dashboard fills in as money moves",
-    }),
-  ).toBeVisible();
+
+  // The v1.1 hero: quiet month eyebrow over the ready-to-plan value.
+  await expect(page.getByTestId("hero")).toBeVisible();
+  await expect(page.getByTestId("ready-to-plan")).toHaveText("$5,000.00");
 });
 
 test("unauthenticated visits to protected routes bounce to login", async ({

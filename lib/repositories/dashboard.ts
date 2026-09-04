@@ -10,7 +10,7 @@
  * approximation is retired by this screen.
  */
 
-import type { DangerState } from "@/src/engine";
+import type { DangerState, TxKind } from "@/src/engine";
 import {
   createBudgetEngine,
   type CategoryAvailable,
@@ -73,6 +73,57 @@ export type LifeEventKind =
   | "CHILD"
   | "CUSTOM";
 
+/**
+ * One row of the dashboard's quiet recent-activity glimpse (v1.1 tier 4).
+ * Read-only projection of a stored transaction — the newest few, with the
+ * names the UI renders resolved server-side.
+ */
+export interface DashboardTransactionRow {
+  id: string;
+  /** Household-local calendar date (YYYY-MM-DD, spec A4). */
+  date: string;
+  /** Preformatted short date ("Sep 3") — locale fixed server-side. */
+  dateLabel: string;
+  payee: string;
+  /** Signed cents: positive = money in. */
+  amountCents: number;
+  kind: TxKind;
+  /** Category name when the transaction carries one. */
+  category: string | null;
+  account: string;
+}
+
+/** The dashboard shows a glimpse, not the ledger — newest five, no more. */
+export const RECENT_TRANSACTION_LIMIT = 5;
+
+/** Pure projection: hydrated rows → the view model the activity list reads. */
+export function toDashboardTransactionRows(
+  rows: Array<{
+    id: string;
+    date: Date;
+    payee: string;
+    amountCents: number;
+    kind: TxKind;
+    category: { name: string } | null;
+    account: { name: string };
+  }>,
+): DashboardTransactionRow[] {
+  return rows.map((row) => ({
+    id: row.id,
+    date: row.date.toISOString().slice(0, 10),
+    dateLabel: row.date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    }),
+    payee: row.payee,
+    amountCents: row.amountCents,
+    kind: row.kind,
+    category: row.category?.name ?? null,
+    account: row.account.name,
+  }));
+}
+
 export interface DashboardLifeEvent {
   id: string;
   kind: LifeEventKind;
@@ -116,6 +167,8 @@ export interface DashboardSnapshot {
   sections: DashboardSection[];
   /** Advisor candidates awaiting confirm/dismiss (D11 seam). */
   lifeEvents: DashboardLifeEvent[];
+  /** Newest transactions first (v1.1 tier 4 glimpse — read-only). */
+  recentTransactions: DashboardTransactionRow[];
 }
 
 export const LIFE_EVENT_KIND_LABELS: Record<LifeEventKind, string> = {
@@ -290,6 +343,23 @@ export async function getDashboardSnapshot(
     orderBy: { id: "asc" },
   });
 
+  // v1.1 tier 4: a read-only glimpse of the newest activity (no behavior
+  // change — nothing here writes or re-derives money math).
+  const recentRows = await db.transaction.findMany({
+    where: { account: { householdId } },
+    orderBy: [{ date: "desc" }, { id: "desc" }],
+    take: RECENT_TRANSACTION_LIMIT,
+    select: {
+      id: true,
+      date: true,
+      payee: true,
+      amountCents: true,
+      kind: true,
+      category: { select: { name: true } },
+      account: { select: { name: true } },
+    },
+  });
+
   return {
     monthId,
     year: month.year,
@@ -320,5 +390,6 @@ export async function getDashboardSnapshot(
       kind: event.kind as LifeEventKind,
       evidence: event.evidence,
     })),
+    recentTransactions: toDashboardTransactionRows(recentRows),
   };
 }

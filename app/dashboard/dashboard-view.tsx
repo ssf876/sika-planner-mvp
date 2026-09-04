@@ -6,226 +6,255 @@ import { useState } from "react";
 
 import {
   confirmLifeEventAction,
-  declareLifeEventAction,
   dismissLifeEventAction,
 } from "@/app/actions/life-events";
-import { Badge, Card, ProgressBar } from "@/components/ui";
-import type { DangerTone } from "@/components/ui/types";
 import { formatCents } from "@/lib/money";
 import type {
   DashboardCategoryRow,
-  DashboardLifeEvent,
-  DashboardSection,
+  DashboardSectionId,
   DashboardSnapshot,
-  LifeEventKind,
+  DashboardTransactionRow,
 } from "@/lib/repositories/dashboard";
 import { LIFE_EVENT_KIND_LABELS } from "@/lib/repositories/dashboard";
 
 import styles from "./dashboard.module.css";
 
-// ─── Danger vocabulary ───────────────────────────────────────────────────────
+// ─── Presentation helpers (pure — engine data in, display strings out) ──────
 
-/** Visual tone for an engine danger state (funding-behind reads as a warning). */
-function stateToTone(state: DashboardCategoryRow["state"]): DangerTone {
-  return state === "overspent" ? "overspent" : state === "healthy" ? "healthy" : "watch";
+/** CSS modifier for a row's engine state (taupe default, muted red/amber). */
+function stateClass(state: DashboardCategoryRow["state"]): string {
+  if (state === "overspent") return styles.overspent;
+  if (state === "watch") return styles.watch;
+  return "";
 }
 
-const STATE_LABELS: Record<DashboardCategoryRow["state"], string> = {
-  healthy: "Healthy",
-  watch: "Watch",
-  overspent: "Overspent",
-  "funding-behind": "Funding behind",
-};
+/** Fill width for a category's taupe progress hairline (clamped, like the primitive). */
+function spendPercent(spentCents: number, assignedCents: number): number {
+  if (assignedCents > 0) {
+    return Math.min(100, Math.round((spentCents / assignedCents) * 100));
+  }
+  return spentCents > 0 ? 100 : 0;
+}
 
-const STRIP_COPY: Record<
-  DashboardSnapshot["danger"]["overall"],
-  { title: string; detail: (danger: DashboardSnapshot["danger"]) => string }
-> = {
-  healthy: {
-    title: "All clear",
-    detail: () => "Nothing needs attention right now.",
-  },
-  watch: {
-    title: "Watch",
-    detail: (danger) =>
-      `${danger.watchCount} ${danger.watchCount === 1 ? "category is" : "categories are"} close to ${danger.watchCount === 1 ? "its" : "their"} limit.`,
-  },
-  overspent: {
-    title: "Overspent",
-    detail: (danger) =>
-      `${danger.overspentCount} ${danger.overspentCount === 1 ? "category has" : "categories have"} spent past the plan — move money to cover it.`,
-  },
-  "funding-behind": {
-    title: "Funding behind",
-    detail: () =>
-      "A fund is off pace for its target date — top it up or move the date.",
-  },
-};
+function overspentRows(snapshot: DashboardSnapshot): DashboardCategoryRow[] {
+  return snapshot.sections
+    .flatMap((section) => section.categories)
+    .filter((row) => row.state === "overspent");
+}
 
-function DangerStrip({ danger }: { danger: DashboardSnapshot["danger"] }) {
-  const copy = STRIP_COPY[danger.overall];
+/**
+ * The hero's one-line nudge — the single most useful thing to know right
+ * now, in Sika's voice. States facts the engine already computed; it never
+ * invents a recommendation ("move $X from A to B") the engine didn't make.
+ */
+function heroNudge(snapshot: DashboardSnapshot): string {
+  const { danger } = snapshot;
+  if (danger.overall === "overspent") {
+    // Name the worst shortfall as a fact. The fix (if any) lives in the
+    // Attention area — never synthesized here.
+    const worst = overspentRows(snapshot).reduce<DashboardCategoryRow | null>(
+      (acc, row) =>
+        acc === null || row.availableCents < acc.availableCents ? row : acc,
+      null,
+    );
+    return worst
+      ? `${worst.name} is ${formatCents(-worst.availableCents)} over plan.`
+      : "Sika found something that needs attention.";
+  }
+  if (danger.fundingBehindCount > 0) {
+    return "A fund is off pace for its target date.";
+  }
+  if (danger.watchCount > 0) {
+    return danger.watchCount === 1
+      ? "You're on track, but one category is close to its limit."
+      : `You're on track, but ${danger.watchCount} categories are close to their limit.`;
+  }
+  return "You're on track.";
+}
+
+// ─── Tier 1 · Hero ───────────────────────────────────────────────────────────
+
+/**
+ * Month, money left, spent-of-planned — typography and whitespace define
+ * the surface; no bordered card (v1.1: cards are earned). With zero
+ * transactions the same surface reads as "ready to plan" with a CTA.
+ */
+function Hero({ snapshot }: { snapshot: DashboardSnapshot }) {
+  if (!snapshot.hasTransactions) {
+    return (
+      <section className={styles.hero} data-testid="hero" data-empty="">
+        <p className={styles.heroEyebrow}>{snapshot.monthLabel}</p>
+        <p className={styles.heroValue} data-testid="ready-to-plan">
+          {formatCents(snapshot.income.expectedCents)}
+        </p>
+        <p className={styles.heroSupport}>ready to plan — nothing assigned yet</p>
+        <Link href="/planner" className={styles.heroCta}>
+          Plan the month
+        </Link>
+      </section>
+    );
+  }
+
+  const moneyLeft = snapshot.budget.assignedCents - snapshot.budget.spentCents;
   return (
-    <Card
-      tone={danger.overall === "healthy" ? "neutral" : stateToTone(danger.overall)}
-      className={styles.strip}
-      data-testid="danger-strip"
+    <section className={styles.hero} data-testid="hero">
+      <p className={styles.heroEyebrow}>{snapshot.monthLabel}</p>
+      <p
+        className={`${styles.heroValue} ${moneyLeft < 0 ? styles.heroValueOver : ""}`}
+        data-testid="money-left"
+      >
+        {formatCents(moneyLeft)}
+      </p>
+      <p className={styles.heroSupport} data-testid="spent-of-planned">
+        {formatCents(snapshot.budget.spentCents)} spent of{" "}
+        {formatCents(snapshot.budget.assignedCents)} planned
+      </p>
+      <p className={styles.heroNudge} data-testid="hero-nudge">
+        {heroNudge(snapshot)}
+      </p>
+    </section>
+  );
+}
+
+// ─── Tier 2 · Your plan ──────────────────────────────────────────────────────
+
+/**
+ * The dashboard's plan view: Needs / Wants / Savings & goals, open rows with
+ * hairline separators, taupe progress. The v1 sections' funds, debts, and
+ * investments stay in the snapshot for other surfaces — the composition
+ * simply doesn't render them (nothing deleted, git history is the rollback).
+ */
+const PLAN_GROUPS: ReadonlyArray<{
+  id: string;
+  title: string;
+  sectionIds: readonly DashboardSectionId[];
+}> = [
+  { id: "needs", title: "Needs", sectionIds: ["needs"] },
+  { id: "wants", title: "Wants", sectionIds: ["wants"] },
+  {
+    id: "savings",
+    title: "Savings & goals",
+    // Debt payoff joins the goals: its category row (with the overspent
+    // state) stays visible even though the owed-account rows do not render.
+    sectionIds: ["savings-funds", "investments", "debts"],
+  },
+];
+
+function PlanRow({ row }: { row: DashboardCategoryRow }) {
+  const over = row.state === "overspent" && row.availableCents < 0;
+  return (
+    <li
+      className={`${styles.planRow} ${stateClass(row.state)}`}
+      data-state={row.state}
     >
-      <p className={styles.stripTitle}>
-        <strong>{copy.title}</strong> {copy.detail(danger)}
-      </p>
-    </Card>
-  );
-}
-
-// ─── Metric cards ────────────────────────────────────────────────────────────
-
-function BudgetCard({ snapshot }: { snapshot: DashboardSnapshot }) {
-  return (
-    <Card className={styles.metricCard}>
-      {/* Mock-up grammar: "April Budget — $2,500 spent of $5,500". */}
-      <ProgressBar
-        label={`${snapshot.monthLabel} budget — ${formatCents(
-          snapshot.budget.spentCents,
-        )} spent of ${formatCents(snapshot.budget.assignedCents)}`}
-        value={snapshot.budget.spentCents}
-        max={snapshot.budget.assignedCents}
-        hideAmounts
-      />
-      <p className="muted">
-        Ready to assign{" "}
-        <strong data-testid="ready-to-assign">
-          {formatCents(snapshot.readyToAssignCents)}
-        </strong>{" "}
-        — assign every dollar in the{" "}
-        <Link href="/planner">monthly planner</Link>.
-      </p>
-    </Card>
-  );
-}
-
-function IncomeCard({ snapshot }: { snapshot: DashboardSnapshot }) {
-  return (
-    <Card className={styles.metricCard}>
-      <h2>Income</h2>
-      <p className={styles.metricValue} data-testid="income-line">
-        {formatCents(snapshot.income.receivedCents)} received of{" "}
-        {formatCents(snapshot.income.expectedCents)} expected
-      </p>
-      {snapshot.income.fundDrawCents > 0 ? (
-        <p className="muted">
-          Plus {formatCents(snapshot.income.fundDrawCents)} popped up from
-          funds — cashflow, never paycheck income.
-        </p>
-      ) : (
-        <p className="muted">
-          Recorded income lands here and feeds Ready to Assign.
-        </p>
-      )}
-    </Card>
-  );
-}
-
-function NetWorthCard({ snapshot }: { snapshot: DashboardSnapshot }) {
-  return (
-    <Card className={styles.metricCard}>
-      <h2>Net worth</h2>
-      <p className={styles.netWorth} data-testid="net-worth">
-        {formatCents(snapshot.netWorthCents)}
-      </p>
-      <p className="muted">
-        Across {snapshot.accountCount}{" "}
-        {snapshot.accountCount === 1 ? "account" : "accounts"} — credit
-        balances count against it.
-      </p>
-    </Card>
-  );
-}
-
-// ─── Sections ────────────────────────────────────────────────────────────────
-
-function CategoryRow({ row }: { row: DashboardCategoryRow }) {
-  return (
-    <li className={styles.row}>
-      <div className={styles.rowMain}>
-        <ProgressBar
-          label={row.name}
-          value={row.spentCents}
-          max={row.assignedCents}
-          tone={stateToTone(row.state)}
-        />
-        <p className={`muted ${styles.rowAvailable}`}>
-          {formatCents(row.availableCents)} available
-        </p>
+      <div className={styles.planRowTop}>
+        <span className={styles.planRowName}>{row.name}</span>
+        <span className={styles.planRowLeft} data-testid="category-left">
+          {over
+            ? `${formatCents(-row.availableCents)} over`
+            : `${formatCents(row.availableCents)} left`}
+        </span>
       </div>
-      {row.state !== "healthy" ? (
-        <Badge tone={stateToTone(row.state)}>{STATE_LABELS[row.state]}</Badge>
-      ) : null}
+      <div
+        className={styles.planRowTrack}
+        role="progressbar"
+        aria-label={row.name}
+        aria-valuenow={row.spentCents}
+        aria-valuemin={0}
+        aria-valuemax={row.assignedCents}
+        aria-valuetext={`${formatCents(row.spentCents)} of ${formatCents(row.assignedCents)}`}
+      >
+        <div
+          className={styles.planRowFill}
+          style={{ width: `${spendPercent(row.spentCents, row.assignedCents)}%` }}
+        />
+      </div>
+      <p className={styles.planRowMeta}>
+        {formatCents(row.spentCents)} spent of {formatCents(row.assignedCents)}{" "}
+        planned
+      </p>
     </li>
   );
 }
 
-function SectionCard({ section }: { section: DashboardSection }) {
-  const nothing =
-    section.categories.length === 0 &&
-    (section.funds?.length ?? 0) === 0 &&
-    (section.debts?.length ?? 0) === 0;
+function Plan({ snapshot }: { snapshot: DashboardSnapshot }) {
+  const byId = new Map(
+    snapshot.sections.map((section) => [section.id, section] as const),
+  );
 
   return (
-    <Card className={styles.section} data-testid={`section-${section.id}`}>
-      <h2>{section.title}</h2>
-      {nothing ? (
-        <p className="muted">
-          Nothing planned here yet — assign this section in the{" "}
-          <Link href="/planner">planner</Link>.
-        </p>
-      ) : (
-        <ul className={styles.rowList}>
-          {section.categories.map((row) => (
-            <CategoryRow key={row.categoryId} row={row} />
-          ))}
-          {section.funds?.map((fund) => (
-            <li key={fund.id} className={styles.row}>
-              <div className={styles.rowMain}>
-                <span className={styles.rowLabel}>{fund.name}</span>
-                <p className={styles.rowAvailable}>
-                  {formatCents(fund.balanceCents)}
-                  {fund.targetCents != null
-                    ? ` toward ${formatCents(fund.targetCents)}`
-                    : " saved"}{" "}
-                  · {fund.kind === "SINKING" ? "sinking fund" : "static goal"}
-                </p>
-              </div>
-            </li>
-          ))}
-          {section.debts?.map((debt) => (
-            <li key={debt.id} className={styles.row}>
-              <div className={styles.rowMain}>
-                <span className={styles.rowLabel}>{debt.name}</span>
-                <p className={styles.rowAvailable}>
-                  {formatCents(debt.owedCents)} owed
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
+    <section className={styles.plan} data-testid="plan">
+      <div className={styles.sectionHead}>
+        <h2 className={styles.sectionTitle}>Your plan</h2>
+        {snapshot.hasTransactions ? (
+          snapshot.readyToAssignCents > 0 ? (
+            <Link
+              href="/planner"
+              className={styles.sectionAction}
+              data-testid="ready-to-assign"
+            >
+              {formatCents(snapshot.readyToAssignCents)} ready to assign
+            </Link>
+          ) : (
+            <p className={styles.sectionAction} data-testid="plan-balanced">
+              Your plan is balanced.
+            </p>
+          )
+        ) : null}
+      </div>
+
+      {PLAN_GROUPS.map((group) => {
+        const rows = group.sectionIds.flatMap(
+          (id) => byId.get(id)?.categories ?? [],
+        );
+        return (
+          <div
+            key={group.id}
+            className={styles.group}
+            data-testid={`plan-group-${group.id}`}
+          >
+            <h3 className={styles.groupTitle}>{group.title}</h3>
+            {rows.length === 0 ? (
+              <p className={`muted ${styles.groupEmpty}`}>
+                Nothing planned here yet.
+              </p>
+            ) : (
+              <ul className={styles.rowList}>
+                {rows.map((row) => (
+                  <PlanRow key={row.categoryId} row={row} />
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
-// ─── Life events card (advisor seam, D11/D12) ───────────────────────────────
+// ─── Tier 3 · Attention ──────────────────────────────────────────────────────
 
-function LifeEventsCard({
-  events,
-}: {
-  events: DashboardLifeEvent[];
-}) {
+/**
+ * The one earned card: existing actionable conditions only — the quiet
+ * danger summary when the engine says something needs eyes, and advisor
+ * candidates awaiting their confirmation gate. Nothing is fabricated here;
+ * every line renders data the snapshot already carried.
+ */
+function Attention({ snapshot }: { snapshot: DashboardSnapshot }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [declareKind, setDeclareKind] = useState<LifeEventKind>("MOVE");
 
-  async function run(key: string, action: () => Promise<{ ok: boolean; error: string | null }>) {
+  const events = snapshot.lifeEvents;
+  const { overall } = snapshot.danger;
+  const needsEyes = overall === "overspent" || overall === "funding-behind";
+
+  if (!needsEyes && events.length === 0) return null;
+
+  async function run(
+    key: string,
+    action: () => Promise<{ ok: boolean; error: string | null }>,
+  ) {
     setError(null);
     setBusy(key);
     try {
@@ -240,151 +269,145 @@ function LifeEventsCard({
     }
   }
 
-  const kindOptions = Object.entries(LIFE_EVENT_KIND_LABELS) as [
-    LifeEventKind,
-    string,
-  ][];
-
   return (
-    <Card className={styles.section} data-testid="life-events-card">
-      <h2>Life events</h2>
-
+    <section className={styles.attention} data-testid="attention">
       {error ? (
         <p role="alert" className="form-error">
           {error}
         </p>
       ) : null}
 
-      {events.length === 0 ? (
-        <p className="muted" data-testid="life-events-empty">
-          Nothing new detected — declare a life change if one just happened.
+      {needsEyes ? (
+        <div data-testid="danger-summary">
+          <p className={styles.attentionHeading}>
+            Sika found something that needs attention.
+          </p>
+          <p className={styles.attentionDetail}>
+            {overall === "overspent" ? (
+              <Link href="/planner">Move money to cover it in the planner</Link>
+            ) : (
+              "A fund is off pace — top it up or move the date in Funds & Goals."
+            )}
+          </p>
+        </div>
+      ) : null}
+
+      {events.length > 0 ? (
+        <div data-testid="life-events">
+          <p className={styles.attentionHeading}>
+            Planning around something new?
+          </p>
+          <ul className={styles.attentionList}>
+            {events.map((event) => (
+              <li key={event.id} className={styles.attentionItem}>
+                <div className={styles.attentionCopy}>
+                  <span className={styles.attentionKind}>
+                    {LIFE_EVENT_KIND_LABELS[event.kind]}
+                  </span>
+                  {event.evidence ? (
+                    <span className={`muted ${styles.attentionEvidence}`}>
+                      {event.evidence}
+                    </span>
+                  ) : null}
+                </div>
+                <div className={styles.attentionActions}>
+                  <button
+                    type="button"
+                    className={styles.confirmBtn}
+                    disabled={busy !== null}
+                    onClick={() =>
+                      run(`confirm:${event.id}`, () =>
+                        confirmLifeEventAction(event.id),
+                      )
+                    }
+                  >
+                    {busy === `confirm:${event.id}` ? "Confirming…" : "Confirm"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.quietBtn}
+                    disabled={busy !== null}
+                    onClick={() =>
+                      run(`dismiss:${event.id}`, () =>
+                        dismissLifeEventAction(event.id),
+                      )
+                    }
+                  >
+                    {busy === `dismiss:${event.id}` ? "Dismissing…" : "Not now"}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+// ─── Tier 4 · Recent activity ────────────────────────────────────────────────
+
+/**
+ * A quiet typeset glimpse of the newest transactions — payee, amount,
+ * category if available, account, date. A glimpse, not the Activity page.
+ */
+function RecentActivity({
+  transactions,
+}: {
+  transactions: DashboardTransactionRow[];
+}) {
+  return (
+    <section className={styles.activity} data-testid="recent-activity">
+      <div className={styles.sectionHead}>
+        <h2 className={styles.sectionTitle}>Recent activity</h2>
+        <Link href="/transactions" className={styles.sectionAction}>
+          See all
+        </Link>
+      </div>
+
+      {transactions.length === 0 ? (
+        <p className={`muted ${styles.activityEmpty}`} data-testid="activity-empty">
+          Nothing yet — spending you record shows up here.
         </p>
       ) : (
-        <ul className={styles.rowList}>
-          {events.map((event) => (
-            <li key={event.id} className={styles.candidate}>
-              <div className={styles.rowMain}>
-                <strong>{LIFE_EVENT_KIND_LABELS[event.kind]}</strong>
-                {event.evidence ? <p className="muted">{event.evidence}</p> : null}
+        <ul className={styles.activityList} data-testid="activity-list">
+          {transactions.map((tx) => (
+            <li key={tx.id} className={styles.activityRow}>
+              <div className={styles.activityCopy}>
+                <span className={styles.activityPayee}>{tx.payee}</span>
+                <span className="muted">
+                  {[tx.category, tx.account, tx.dateLabel]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
               </div>
-              <div className={styles.candidateActions}>
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() =>
-                    run(`confirm:${event.id}`, () =>
-                      confirmLifeEventAction(event.id),
-                    )
-                  }
-                >
-                  {busy === `confirm:${event.id}` ? "Confirming…" : "Confirm"}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() =>
-                    run(`dismiss:${event.id}`, () =>
-                      dismissLifeEventAction(event.id),
-                    )
-                  }
-                >
-                  {busy === `dismiss:${event.id}` ? "Dismissing…" : "Dismiss"}
-                </button>
-              </div>
+              <span className={styles.activityAmount}>
+                {tx.amountCents >= 0 ? "+" : ""}
+                {formatCents(tx.amountCents)}
+              </span>
             </li>
           ))}
         </ul>
       )}
-
-      <div className={styles.declareRow}>
-        <label>
-          <select
-            aria-label="Declare a life change"
-            value={declareKind}
-            onChange={(e) => setDeclareKind(e.target.value as LifeEventKind)}
-            disabled={busy !== null}
-          >
-            {kindOptions.map(([kind, label]) => (
-              <option key={kind} value={kind}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          disabled={busy !== null}
-          onClick={() =>
-            run("declare", () => declareLifeEventAction(declareKind))
-          }
-        >
-          {busy === "declare" ? "Declaring…" : "Declare"}
-        </button>
-      </div>
-      <p className="muted">
-        Confirming turns a detected season into a plan you apply line by line;
-        dismissing suppresses that rule. Declaring records your own season —
-        useful before any history exists.
-      </p>
-    </Card>
-  );
-}
-
-// ─── Zero-transaction empty state ────────────────────────────────────────────
-
-function EmptyDashboard() {
-  return (
-    <Card className={styles.emptyHero} data-testid="dashboard-empty">
-      <h2>Your dashboard fills in as money moves</h2>
-      <p>
-        Spending you enter or import will show up here and deplete category
-        availability in real time. Recorded income feeds Ready to Assign, and
-        your accounts build the net-worth figure.
-      </p>
-      <p>
-        Start by planning the month — every dollar gets a job before anything
-        is spent.
-      </p>
-      <p>
-        <Link href="/planner" className={styles.emptyLink}>
-          Plan the month →
-        </Link>
-      </p>
-    </Card>
+    </section>
   );
 }
 
 // ─── The view ────────────────────────────────────────────────────────────────
 
 /**
- * The home screen (D7): budget progress, income received vs expected, the
- * five mock-up sections, net worth, the danger strip, and the Life events
- * card — with a zero-transaction empty state that points at the planner.
+ * The v1.1 dashboard (spec §Screens): hero → your plan → attention →
+ * recent activity, in that render order. One composition for every
+ * household — with zero transactions the structure stays, the numbers
+ * read "ready to plan", and the empties stay quiet.
  */
 export function DashboardView({ snapshot }: { snapshot: DashboardSnapshot }) {
-  if (!snapshot.hasTransactions) {
-    return (
-      <div className="stack">
-        <EmptyDashboard />
-        <LifeEventsCard events={snapshot.lifeEvents} />
-      </div>
-    );
-  }
-
   return (
-    <div className="stack">
-      <DangerStrip danger={snapshot.danger} />
-      <div className={styles.metrics}>
-        <BudgetCard snapshot={snapshot} />
-        <IncomeCard snapshot={snapshot} />
-        <NetWorthCard snapshot={snapshot} />
-      </div>
-      <div className={styles.sectionGrid}>
-        {snapshot.sections.map((section) => (
-          <SectionCard key={section.id} section={section} />
-        ))}
-      </div>
-      <LifeEventsCard events={snapshot.lifeEvents} />
+    <div className={styles.dashboard} data-testid="dashboard">
+      <Hero snapshot={snapshot} />
+      <Plan snapshot={snapshot} />
+      <Attention snapshot={snapshot} />
+      <RecentActivity transactions={snapshot.recentTransactions} />
     </div>
   );
 }

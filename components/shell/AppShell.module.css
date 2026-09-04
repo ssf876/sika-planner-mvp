@@ -1,0 +1,100 @@
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  border-bottom: 1px solid var(--sp-color-border);
+  background: var(--sp-color-bg);
+}
+
+.headerInner {
+  max-width: var(--sp-container-max);
+  margin: 0 auto;
+  height: var(--sp-shell-height);
+  padding: 0 var(--sp-page-padding);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-space-8);
+}
+
+.brandLink {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--sp-radius-sm);
+}
+
+.brandLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sp-color-focus-ring);
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-space-6);
+}
+
+.navLink {
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-md);
+  font-weight: var(--sp-font-weight-medium);
+  color: var(--sp-color-text-muted);
+  text-decoration: none;
+  padding: var(--sp-space-2) 0;
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--sp-duration-fast) var(--sp-ease-standard),
+    border-color var(--sp-duration-fast) var(--sp-ease-standard);
+}
+
+.navLink:hover {
+  color: var(--sp-color-text);
+}
+
+.navLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sp-color-focus-ring);
+  border-radius: var(--sp-radius-sm);
+}
+
+.navLinkActive {
+  color: var(--sp-color-text);
+  border-bottom-color: var(--sp-color-accent);
+}
+
+.profileArea {
+  margin-left: auto;
+}
+
+.main {
+  flex: 1;
+  width: 100%;
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: var(--sp-space-10) var(--sp-page-padding) var(--sp-space-16);
+}
+
+.pageHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-space-4);
+  margin-bottom: var(--sp-space-8);
+}
+
+.pageTitle {
+  margin: 0;
+  font-family: var(--sp-font-display);
+  font-size: var(--sp-text-page-title);
+  font-weight: var(--sp-font-weight-display);
+  line-height: var(--sp-leading-tight);
+  letter-spacing: -0.01em;
+}
+
+.titleActions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-space-4);
+}

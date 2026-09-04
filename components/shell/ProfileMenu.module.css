@@ -1,0 +1,82 @@
+.wrap {
+  position: relative;
+}
+
+.avatarButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--sp-radius-full);
+  border: 1px solid var(--sp-color-border-strong);
+  background: var(--sp-color-surface);
+  color: var(--sp-color-text);
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-label);
+  font-weight: var(--sp-font-weight-semibold);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-standard);
+}
+
+.avatarButton:hover {
+  background: var(--sp-color-hover);
+}
+
+.avatarButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sp-color-focus-ring);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--sp-color-surface);
+  border: 1px solid var(--sp-color-border);
+  border-radius: var(--sp-radius-md);
+  box-shadow: var(--sp-shadow-md);
+  padding: var(--sp-space-2);
+  z-index: var(--sp-z-dropdown);
+}
+
+.menuEmail {
+  padding: var(--sp-space-2) var(--sp-space-3);
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-caption);
+  color: var(--sp-color-text-muted);
+  border-bottom: 1px solid var(--sp-color-border);
+  margin-bottom: var(--sp-space-1);
+  overflow-wrap: anywhere;
+}
+
+.signOutForm {
+  display: block;
+}
+
+.signOutItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-space-2) var(--sp-space-3);
+  border: none;
+  border-radius: var(--sp-radius-sm);
+  background: transparent;
+  color: var(--sp-color-text);
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-md);
+  font-weight: var(--sp-font-weight-medium);
+  cursor: pointer;
+  transition: background-color var(--sp-duration-fast) var(--sp-ease-standard);
+}
+
+.signOutItem:hover {
+  background: var(--sp-color-hover);
+}
+
+.signOutItem:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sp-color-focus-ring);
+}

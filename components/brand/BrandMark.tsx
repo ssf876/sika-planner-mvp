@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 import styles from "./BrandMark.module.css";
 
 /**
@@ -9,11 +11,12 @@ import styles from "./BrandMark.module.css";
  */
 export function BrandMark() {
   return (
-    <img
+    <Image
       src="/brand/sika-wordmark.svg"
       alt="Sika"
       width={872}
       height={280}
+      priority
       className={styles.mark}
     />
   );

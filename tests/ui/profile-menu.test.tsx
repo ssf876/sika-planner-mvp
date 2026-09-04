@@ -2,16 +2,17 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { signOutAction } from "@/app/actions/auth";
 import { ProfileMenu } from "@/components/shell/ProfileMenu";
 
-const signOutAction = vi.fn(async () => {});
-
 vi.mock("@/app/actions/auth", () => ({
-  signOutAction: (...args: unknown[]) => signOutAction(...args),
+  signOutAction: vi.fn(async () => {}),
 }));
 
+const signOutMock = vi.mocked(signOutAction);
+
 beforeEach(() => {
-  signOutAction.mockClear();
+  signOutMock.mockClear();
 });
 
 describe("ProfileMenu", () => {

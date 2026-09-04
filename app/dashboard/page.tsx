@@ -1,7 +1,5 @@
-import Link from "next/link";
-
+import { AppShell } from "@/components/shell/AppShell";
 import { prisma } from "@/lib/db";
-import { signOutAction } from "@/app/actions/auth";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { getDashboardSnapshot } from "@/lib/repositories/dashboard";
 
@@ -26,21 +24,8 @@ export default async function DashboardPage() {
   );
 
   return (
-    <main>
-      <header className="topbar">
-        <h1>Sika Planner</h1>
-        <nav className="topbar-links">
-          <Link href="/planner">Monthly planner</Link>
-          <Link href="/transactions">Enter transactions</Link>
-          <Link href="/funds">Funds &amp; goals</Link>
-          <Link href="/reports">Reports</Link>
-          <form action={signOutAction}>
-            <button type="submit">Sign out</button>
-          </form>
-        </nav>
-      </header>
-
+    <AppShell active="overview" title="Overview" email={user.email}>
       <DashboardView snapshot={snapshot} />
-    </main>
+    </AppShell>
   );
 }

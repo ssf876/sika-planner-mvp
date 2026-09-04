@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { AppShell } from "@/components/shell/AppShell";
 import { prisma } from "@/lib/db";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { getPlannerSnapshot } from "@/lib/repositories/planner";
@@ -54,12 +53,11 @@ export default async function PlannerPage() {
   );
 
   return (
-    <main>
-      <header className="topbar">
-        <h1>{monthTitle(snapshot.year, snapshot.month)} planner</h1>
-        <Link href="/dashboard">Back to dashboard</Link>
-      </header>
-
+    <AppShell
+      active="plan"
+      title={`${monthTitle(snapshot.year, snapshot.month)} planner`}
+      email={user.email}
+    >
       <PlannerView
         monthId={snapshot.monthId}
         incomeReceivedCents={snapshot.incomeReceivedCents}
@@ -69,6 +67,6 @@ export default async function PlannerPage() {
         proposals={proposals}
         windfall={windfall}
       />
-    </main>
+    </AppShell>
   );
 }

@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { AppShell } from "@/components/shell/AppShell";
 import { prisma } from "@/lib/db";
 import { requireOnboardedUser } from "@/lib/auth/session";
 import { listFundBoard } from "@/lib/repositories/funds";
@@ -40,14 +39,7 @@ export default async function FundsPage() {
   ]);
 
   return (
-    <main>
-      <header className="topbar">
-        <h1>Funds &amp; goals</h1>
-        <nav className="topbar-links">
-          <Link href="/dashboard">Back to dashboard</Link>
-        </nav>
-      </header>
-
+    <AppShell title="Funds & goals" email={user.email}>
       <div className="stack">
         <FundsBoard
           funds={board.funds}
@@ -58,6 +50,6 @@ export default async function FundsPage() {
         />
         <GoalsPanel goals={goals} />
       </div>
-    </main>
+    </AppShell>
   );
 }

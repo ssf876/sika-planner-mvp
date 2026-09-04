@@ -18,9 +18,8 @@ function renderShell() {
 describe("AppShell", () => {
   it("renders the brand mark", () => {
     renderShell();
-    expect(screen.getByAltText("Sika")).toHaveAttribute(
-      "src",
-      "/brand/sika-wordmark.svg",
+    expect(screen.getByAltText("Sika").getAttribute("src")).toContain(
+      "sika-wordmark.svg",
     );
   });
 

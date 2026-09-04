@@ -43,6 +43,26 @@ main {
   margin-top: 1rem;
 }
 
+/* Quiet link for the page-head action slot (e.g. report month paging). */
+.title-action {
+  font-family: var(--sp-font-ui);
+  font-size: var(--sp-text-md);
+  font-weight: var(--sp-font-weight-medium);
+  color: var(--sp-color-text-muted);
+  text-decoration: none;
+  transition: color var(--sp-duration-fast) var(--sp-ease-standard);
+}
+
+.title-action:hover {
+  color: var(--sp-color-text);
+}
+
+.title-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sp-color-focus-ring);
+  border-radius: var(--sp-radius-sm);
+}
+
 .card {
   border: 1px solid var(--sp-color-border);
   border-radius: var(--sp-radius-lg);

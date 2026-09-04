@@ -1,7 +1,7 @@
 .table {
   width: 100%;
   border-collapse: collapse;
-  font-family: var(--sp-font-sans);
+  font-family: var(--sp-font-ui);
   font-size: var(--sp-text-md);
   color: var(--sp-color-text);
 }
@@ -28,7 +28,7 @@
 
 /* Neutral hover must lose to the danger tints below, so it comes first. */
 .row:hover {
-  background: var(--sp-gray-50);
+  background: var(--sp-color-hover);
 }
 
 .row.selected {

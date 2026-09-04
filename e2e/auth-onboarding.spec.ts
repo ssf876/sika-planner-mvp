@@ -24,12 +24,45 @@ async function completeOnboarding(page: Page): Promise<void> {
   await page.getByLabel("How much do you make per month?").fill("5000");
   await page.getByLabel("Just me").check();
   await page.getByRole("button", { name: "Start budgeting" }).click();
-  await page.waitForURL("**/dashboard");
+  // First-run account setup (v1.1 PR 4): the budget is seeded, now the
+  // household needs an account before the dashboard makes sense.
+  await page.waitForURL("**/onboarding/accounts");
 }
 
-test("signup → onboard → zero-transaction dashboard", async ({ page }) => {
+/** Create one account through the setup step's form and stay on the step. */
+async function createAccountViaSetup(
+  page: Page,
+  account: { kind: string; name: string; startingBalance?: string },
+): Promise<void> {
+  await page.getByRole("radio", { name: account.kind }).check();
+  await page.getByLabel("Account name").fill(account.name);
+  if (account.startingBalance) {
+    await page.getByLabel("Starting balance").fill(account.startingBalance);
+  }
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: `Created ${account.name}.` }),
+  ).toBeVisible();
+}
+
+test("signup → onboard → first account → zero-transaction dashboard", async ({
+  page,
+}) => {
   await signup(page);
   await completeOnboarding(page);
+
+  // The setup step: four first-run kinds, one account to start with.
+  await expect(
+    page.getByRole("heading", { name: "Set up your first account" }),
+  ).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Investment" })).toHaveCount(0);
+  await createAccountViaSetup(page, {
+    kind: "Checking",
+    name: "Everyday Checking",
+    startingBalance: "1,200",
+  });
+  await page.getByRole("link", { name: "Go to your dashboard" }).click();
+  await page.waitForURL("**/dashboard");
 
   // v1.1: with no transactions yet the dashboard keeps the product's
   // structure — a hero that names the amount ready to plan, the one CTA,
@@ -49,6 +82,13 @@ test("signup → onboard → zero-transaction dashboard", async ({ page }) => {
 test("login returns an onboarded user to their dashboard", async ({ page }) => {
   const email = await signup(page);
   await completeOnboarding(page);
+  await createAccountViaSetup(page, {
+    kind: "Checking",
+    name: "Everyday Checking",
+    startingBalance: "1,200",
+  });
+  await page.getByRole("link", { name: "Go to your dashboard" }).click();
+  await page.waitForURL("**/dashboard");
 
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("menuitem", { name: "Sign out" }).click();

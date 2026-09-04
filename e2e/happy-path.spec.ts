@@ -1,15 +1,14 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { seedAccountsFor } from "./helpers/seed-accounts";
-
-// The month loop end to end (spec art_psxjH3kE): signup → onboard → assign →
-// CSV import → review → spend (credit + ATM) → danger state → windfall →
-// season confirmation → Planned vs Actual. One serial journey on one
-// household, because every step builds the ledger the next step reads.
+// The month loop end to end (spec art_psxjH3kE): signup → onboard → set up
+// accounts → assign → CSV import → review → spend (credit + ATM) → danger
+// state → windfall → season confirmation → Planned vs Actual. One serial
+// journey on one household, because every step builds the ledger the next
+// step reads.
 //
-// v1 has no account-creation UI (deferred with PR #8), so the household's
-// checking/credit/cash accounts are seeded straight into the e2e database —
-// the same rows the transaction forms and net-worth card read.
+// v1.1 PR 4 added the first-run account setup step, so every account in this
+// journey is created through the UI during onboarding — zero seeded database
+// state anywhere in the flow.
 
 // ─── Session helpers (same shapes as auth-onboarding.spec.ts) ───────────────
 
@@ -34,8 +33,32 @@ async function completeOnboarding(page: Page): Promise<void> {
   await page.getByLabel("How much do you make per month?").fill("5000");
   await page.getByLabel("Just me").check();
   await page.getByRole("button", { name: "Start budgeting" }).click();
-  await page.waitForURL("**/dashboard");
+  await page.waitForURL("**/onboarding/accounts");
 }
+
+/** Create one account through the setup step's form and stay on the step. */
+async function createAccountViaSetup(
+  page: Page,
+  account: { kind: string; name: string; startingBalance?: string },
+): Promise<void> {
+  await page.getByRole("radio", { name: account.kind }).check();
+  await page.getByLabel("Account name").fill(account.name);
+  if (account.startingBalance) {
+    await page.getByLabel("Starting balance").fill(account.startingBalance);
+  }
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: `Created ${account.name}.` }),
+  ).toBeVisible();
+}
+
+/**
+ * Applied confirmations are a short beat by design (they collapse after a
+ * moment), and the server action before one can be slow on a cold dev server
+ * (first invocation compiles the action chunk). The expect timeout only has
+ * to outlive that compile — the assertion passes the instant the note shows.
+ */
+const APPLIED_NOTE_TIMEOUT = 15_000;
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -81,8 +104,26 @@ test("the month loop: signup → assign → import → review → spend → dang
 }) => {
   test.setTimeout(180_000);
 
-  const email = await signup(page);
+  await signup(page);
   await completeOnboarding(page);
+
+  // Accounts first: nothing else in the flow works without them. All three
+  // come through the onboarding setup step — the same names, kinds, and
+  // starting balances the seeded journey used, so the money math below is
+  // identical.
+  await createAccountViaSetup(page, {
+    kind: "Checking",
+    name: "Everyday Checking",
+    startingBalance: "1,200",
+  });
+  await createAccountViaSetup(page, { kind: "Credit card", name: "Visa Card" });
+  await createAccountViaSetup(page, {
+    kind: "Cash wallet",
+    name: "Cash Wallet",
+    startingBalance: "40",
+  });
+  await page.getByRole("link", { name: "Go to your dashboard" }).click();
+  await page.waitForURL("**/dashboard");
 
   // The zero-transaction dashboard keeps the product's structure (v1.1):
   // a hero naming the amount ready to plan, the one CTA, quiet empties.
@@ -92,8 +133,6 @@ test("the month loop: signup → assign → import → review → spend → dang
   await expect(
     hero.getByRole("link", { name: "Plan the month" }),
   ).toHaveAttribute("href", "/planner");
-  // Accounts first: nothing else in the flow works without them.
-  await seedAccountsFor(email);
 
   // ── paycheck in, then assign every dollar (D6) ──────────────────────
   // The empty planner is honest: no income and nothing assigned yet —
@@ -335,7 +374,7 @@ test("the month loop: signup → assign → import → review → spend → dang
   // plan.
   await expect(
     proposal.getByText("Applied — $30.50 to Dining Out."),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: APPLIED_NOTE_TIMEOUT });
   await expect(
     proposal.getByText("Overspent — cover the shortfall"),
   ).toHaveCount(0);
@@ -379,7 +418,7 @@ test("the month loop: signup → assign → import → review → spend → dang
   await transportCard.getByRole("button", { name: "Apply" }).click();
   await expect(
     recommendations.getByText("Applied — $325.00 to Transportation."),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: APPLIED_NOTE_TIMEOUT });
   await expect(
     recommendations.getByText("fuel for the moving-day runs"),
   ).toHaveCount(0);

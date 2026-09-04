@@ -13,7 +13,10 @@ export default async function OnboardingPage() {
   return (
     <section className="stack">
       <h1>Welcome to Sika Planner</h1>
-      <p>Three quick answers and your first budget is ready to assign.</p>
+      <p>
+        Three quick answers and your first account, and your budget is ready to
+        assign.
+      </p>
       <OnboardingForm />
     </section>
   );

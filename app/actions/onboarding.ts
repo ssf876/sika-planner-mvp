@@ -53,5 +53,7 @@ export async function onboardAction(
 
   await prisma.$transaction((tx) => applySeedPlan(tx, plan, user.id));
 
-  redirect("/dashboard");
+  // First-run account setup comes next (v1.1 PR 4): a household without an
+  // account can't record a single transaction.
+  redirect("/onboarding/accounts");
 }

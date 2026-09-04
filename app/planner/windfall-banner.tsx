@@ -55,8 +55,15 @@ export function WindfallBanner({
   onAvailabilitySync,
 }: WindfallBannerProps) {
   const [windfallCents, setWindfallCents] = useState<number | null>(null);
-  /** Lines showing the brief Applied beat. */
-  const [appliedLineIds, setAppliedLineIds] = useState<string[]>([]);
+  /**
+   * Confirmations for applied lines, shown for a brief beat. Held in their
+   * own state — not read off the live ranking — because applying also syncs
+   * availability, and the re-ranked proposal drops the now-cured line
+   * immediately; the confirmation must outlive that re-rank.
+   */
+  const [appliedNotes, setAppliedNotes] = useState<
+    { lineId: string; name: string; suggestedCents: number }[]
+  >([]);
   /** Applied lines after the beat — collapsed out of the plan. */
   const [collapsedLineIds, setCollapsedLineIds] = useState<string[]>([]);
   /** Quietly dismissed suggestions — never applied, never persisted. */
@@ -90,7 +97,8 @@ export function WindfallBanner({
     proposal?.lines.filter(
       (line) =>
         !collapsedLineIds.includes(line.lineId) &&
-        !dismissedLineIds.includes(line.lineId),
+        !dismissedLineIds.includes(line.lineId) &&
+        !appliedNotes.some((note) => note.lineId === line.lineId),
     ) ?? [];
 
   function allocateRow(row: WindfallIncomeRow) {
@@ -111,18 +119,28 @@ export function WindfallBanner({
     setError(null);
     setBusyLineId(line.lineId);
     try {
+      // Remainder lines render no Apply button; this narrows the type only.
+      if (line.kind === "remainder") return;
+      const applied = {
+        lineId: line.lineId,
+        name: line.name,
+        suggestedCents: line.suggestedCents,
+      };
       const result = await applyWindfallLineAction(monthId, line);
       if (!result.ok) {
         setError(result.error ?? "That suggestion didn't apply — try again.");
         return;
       }
       if (result.availability) onAvailabilitySync(result.availability);
-      // Brief Applied beat, then the line collapses out of the plan.
-      setAppliedLineIds((prev) => [...prev, line.lineId]);
+      // Brief Applied beat — held in its own state so the live re-rank (the
+      // apply just cured this line) can't swallow it — then the note clears.
+      setAppliedNotes((prev) => [...prev, applied]);
       if (appliedTimerRef.current) clearTimeout(appliedTimerRef.current);
       appliedTimerRef.current = setTimeout(() => {
         setCollapsedLineIds((prev) => [...prev, line.lineId]);
-        setAppliedLineIds((prev) => prev.filter((id) => id !== line.lineId));
+        setAppliedNotes((prev) =>
+          prev.filter((note) => note.lineId !== line.lineId),
+        );
       }, APPLIED_BEAT_MS);
     } catch (caught) {
       console.error("planner: windfall apply failed", caught);
@@ -204,20 +222,6 @@ export function WindfallBanner({
                     {formatCents(line.suggestedCents)}
                   </span>
                 </li>
-              ) : appliedLineIds.includes(line.lineId) ? (
-                <li
-                  key={line.lineId}
-                  className={styles.windfallLine}
-                  data-testid={`windfall-line-${line.lineId}`}
-                >
-                  <p
-                    className={styles.appliedNote}
-                    data-visible="true"
-                    role="status"
-                  >
-                    Applied — {formatCents(line.suggestedCents)} to {line.name}.
-                  </p>
-                </li>
               ) : (
                 <li
                   key={line.lineId}
@@ -258,6 +262,16 @@ export function WindfallBanner({
               ),
             )}
           </ol>
+          {appliedNotes.map((note) => (
+            <p
+              key={note.lineId}
+              className={styles.appliedNote}
+              data-visible="true"
+              role="status"
+            >
+              Applied — {formatCents(note.suggestedCents)} to {note.name}.
+            </p>
+          ))}
         </div>
       ) : null}
     </div>

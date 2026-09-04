@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   applyProposalAction,
@@ -8,25 +8,16 @@ import {
   copyPreviousMonthAction,
   type PlannerActionResult,
 } from "@/app/actions/planner";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card } from "@/components/ui/Card";
 import { classifySpendState } from "@/components/ui/danger-state";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableHeaderCell,
-  TableRow,
-} from "@/components/ui/Table";
-import type { DangerTone } from "@/components/ui/types";
 import { parseIncomeToCents } from "@/lib/auth/validate";
+import { formatCents } from "@/lib/money";
 import type { PlannerProposal } from "@/lib/planner/proposals";
 import type { WindfallContext } from "@/lib/repositories/windfall";
-import { formatCents } from "@/lib/money";
 import type { CategoryAvailable, CategoryGroup } from "@/src/engine";
 
+import { getCompletionState } from "./completion-state";
+import { PlannedAmountCell } from "./planned-amount";
 import { WindfallBanner } from "./windfall-banner";
 
 import styles from "./planner.module.css";
@@ -63,7 +54,7 @@ export interface PlannerViewProps {
   windfall?: WindfallContext | null;
 }
 
-/** Plain-dollars text for assign inputs; blank for unassigned rows. */
+/** Plain-dollars text for the inline editor; blank for unassigned rows. */
 export function formatCentsForInput(cents: number): string {
   return cents === 0 ? "" : (cents / 100).toFixed(2);
 }
@@ -89,9 +80,10 @@ const TRANSPORT_ERROR =
   "We couldn't reach the planner — check your connection and try again.";
 
 /**
- * The monthly planner grid (D6): per-category zero-based assignment with a
- * live Ready-to-Assign indicator, copy-previous-month, overspent warnings,
- * and advisor-proposed rows that mutate nothing until Apply is clicked.
+ * The v1.1 monthly planner: a Ready-to-Assign hero over open category-group
+ * sections with directly editable planned values (the existing assignment
+ * action stays the only writer), semantic healthy/watch/overspent rows, and
+ * Sika recommendation cards that mutate nothing until Apply.
  */
 export function PlannerView({
   monthId,
@@ -111,15 +103,62 @@ export function PlannerView({
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
+  // Inline-edit state: which value is open, per-row validation, and the
+  // brief post-save confirmation.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [validation, setValidation] = useState<Record<string, string | null>>(
+    {},
+  );
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const [appliedId, setAppliedId] = useState<string | null>(null);
+
+  const editButtonRefs = useRef(new Map<string, HTMLButtonElement>());
+  /** Set when an editor closes; the row's affordance gets focus back. */
+  const pendingFocusRef = useRef<string | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const appliedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // The editor mounts with editingId — focus is handled inside
+  // PlannedAmountCell. When it closes, the freshly mounted affordance takes
+  // focus back (focusing the ref before remount would hit a detached node).
+  useEffect(() => {
+    if (editingId) return;
+    if (pendingFocusRef.current) {
+      const categoryId = pendingFocusRef.current;
+      pendingFocusRef.current = null;
+      editButtonRefs.current.get(categoryId)?.focus();
+    }
+  }, [editingId]);
+
+  useEffect(
+    () => () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      if (appliedTimerRef.current) clearTimeout(appliedTimerRef.current);
+    },
+    [],
+  );
+
   // The zero-based target: income received minus what the plan assigns,
   // including unsaved drafts so the indicator moves as you type.
   const readyToAssignCents = useMemo(() => {
     const assigned = categories.reduce((sum, category) => {
-      const draft = parseIncomeToCents(drafts[category.id] ?? "");
+      const raw = drafts[category.id] ?? "";
+      // A cleared field means the money is back in Ready to Assign; garbage
+      // input falls back to the last saved assignment so RTA never jumps.
+      if (raw.trim() === "") return sum;
+      const draft = parseIncomeToCents(raw);
       return sum + (draft ?? assignments[category.id] ?? 0);
     }, 0);
     return incomeReceivedCents - assigned;
   }, [categories, drafts, assignments, incomeReceivedCents]);
+
+  // The balanced "Every dollar assigned" state is an achievement: it only
+  // applies once income has actually arrived. A fresh zero/zero month gets
+  // the "nothing to assign yet" invitation instead.
+  const completion = getCompletionState(
+    incomeReceivedCents,
+    readyToAssignCents,
+  );
 
   const availableById = useMemo(
     () => new Map(availability.map((a) => [a.categoryId, a] as const)),
@@ -144,23 +183,73 @@ export function PlannerView({
     });
   }
 
-  async function handleAssign(categoryId: string) {
+  function setDraft(categoryId: string, value: string) {
+    setDrafts((prev) => ({ ...prev, [categoryId]: value }));
+  }
+
+  function closeEditor(categoryId: string) {
+    pendingFocusRef.current = categoryId;
+    setEditingId((prev) => (prev === categoryId ? null : prev));
+  }
+
+  function cancelEdit(categoryId: string) {
+    setDrafts((prev) => ({
+      ...prev,
+      [categoryId]: formatCentsForInput(assignments[categoryId] ?? 0),
+    }));
+    setValidation((prev) => ({ ...prev, [categoryId]: null }));
+    closeEditor(categoryId);
+  }
+
+  async function commitEdit(categoryId: string) {
+    if (editingId !== categoryId) return;
+    const draft = drafts[categoryId] ?? "";
+    const cents = parseIncomeToCents(draft);
+
+    // Invalid drafts keep their text and show validation — the user
+    // corrects rather than re-types.
+    if (cents === null) {
+      setValidation((prev) => ({
+        ...prev,
+        [categoryId]: "Enter a valid dollar amount.",
+      }));
+      return;
+    }
+
+    // No-op save: close quietly.
+    if (cents === (assignments[categoryId] ?? 0)) {
+      setValidation((prev) => ({ ...prev, [categoryId]: null }));
+      closeEditor(categoryId);
+      return;
+    }
+
     setError(null);
     setBusyKey(`assign:${categoryId}`);
     try {
       const result: PlannerActionResult = await assignCategoryAction(
         monthId,
         categoryId,
-        drafts[categoryId] ?? "",
+        draft.trim(),
       );
       if (!result.ok || !result.availability) {
-        setError(result.error ?? "That assignment didn't save — try again.");
+        // Server rejection keeps the editor open with the reason — the
+        // draft is intact for a retry, and RTA never jumped.
+        setValidation((prev) => ({
+          ...prev,
+          [categoryId]:
+            result.error ?? "That assignment didn't save — try again.",
+        }));
         return;
       }
       syncFromServer(result.availability);
+      setValidation((prev) => ({ ...prev, [categoryId]: null }));
+      closeEditor(categoryId);
+      setSavedId(categoryId);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+      savedTimerRef.current = setTimeout(() => setSavedId(null), 1400);
     } catch (caught) {
       console.error("planner: assign failed", caught);
-      setError(TRANSPORT_ERROR);
+      setValidation((prev) => ({ ...prev, [categoryId]: TRANSPORT_ERROR }));
     } finally {
       setBusyKey(null);
     }
@@ -176,13 +265,23 @@ export function PlannerView({
         return;
       }
       syncFromServer(result.availability);
-      setProposals((prev) => prev.filter((p) => p.id !== proposal.id));
+      // Brief "Applied" beat on the card, then the suggestion collapses.
+      setAppliedId(proposal.id);
+      if (appliedTimerRef.current) clearTimeout(appliedTimerRef.current);
+      appliedTimerRef.current = setTimeout(() => {
+        setProposals((prev) => prev.filter((p) => p.id !== proposal.id));
+        setAppliedId(null);
+      }, 1400);
     } catch (caught) {
       console.error("planner: apply failed", caught);
       setError(TRANSPORT_ERROR);
     } finally {
       setBusyKey(null);
     }
+  }
+
+  function handleDismiss(proposalId: string) {
+    setProposals((prev) => prev.filter((p) => p.id !== proposalId));
   }
 
   async function handleCopy() {
@@ -212,7 +311,7 @@ export function PlannerView({
   }
 
   return (
-    <div className="stack">
+    <div className={styles.planner}>
       {windfall ? (
         <WindfallBanner
           monthId={windfall.monthId}
@@ -224,170 +323,218 @@ export function PlannerView({
         />
       ) : null}
 
-      <Card>
-        <Card.Body>
-          <div className={styles.summaryRow} aria-live="polite">
-            <div className={styles.summaryRta}>
-              <span className="muted">Ready to assign</span>
-              <strong
-                className={readyToAssignCents < 0 ? styles.negative : undefined}
-                data-testid="ready-to-assign"
-              >
-                {formatCents(readyToAssignCents)}
-              </strong>
-            </div>
-            {readyToAssignCents === 0 ? (
-              <Badge tone="healthy">Every dollar assigned</Badge>
-            ) : readyToAssignCents < 0 ? (
-              <Badge tone="overspent">Over-assigned</Badge>
-            ) : (
-              <Badge tone="info">Assign every dollar</Badge>
-            )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => void handleCopy()}
-              disabled={!hasPreviousMonth || busyKey !== null}
-              aria-label="Copy last month's assignments"
-            >
-              {busyKey === "copy" ? "Copying…" : "Copy last month"}
-            </Button>
-          </div>
-          {!hasPreviousMonth ? (
-            <p className="hint">
-              No previous month to copy yet — this planner starts fresh.
-            </p>
-          ) : null}
-        </Card.Body>
-      </Card>
+      <section aria-label="Ready to assign" className={styles.summary} aria-live="polite">
+        <span className={styles.summaryLabel}>Ready to assign</span>
+        <strong
+          className={styles.summaryAmount}
+          data-negative={readyToAssignCents < 0 ? "true" : undefined}
+          data-testid="ready-to-assign"
+        >
+          {formatCents(readyToAssignCents)}
+        </strong>
+        {savedId ? (
+          <span className={styles.savedNote} role="status">
+            Saved
+          </span>
+        ) : null}
+        {completion.message ? (
+          <p
+            className={styles.completionMessage}
+            data-kind={completion.kind}
+          >
+            {completion.message}
+          </p>
+        ) : null}
+      </section>
 
-      <Card>
-        <Card.Body>
-          {error ? (
-            <p role="alert" className="form-error">
-              {error}
-            </p>
-          ) : null}
-          <Table>
-            <TableHeader>
-              <tr>
-                <TableHeaderCell>Category</TableHeaderCell>
-                <TableHeaderCell>Assigned</TableHeaderCell>
-                <TableHeaderCell>Spent</TableHeaderCell>
-                <TableHeaderCell>Available</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
-              </tr>
-            </TableHeader>
-            <TableBody>
-              {GROUP_ORDER.flatMap((group) => {
-                const inGroup = categories.filter((c) => c.group === group);
-                if (inGroup.length === 0) return [];
-                return [
-                  <TableRow key={`group-${group}`} className={styles.groupRow}>
-                    <TableCell colSpan={5}>{GROUP_LABELS[group]}</TableCell>
-                  </TableRow>,
-                  ...inGroup.flatMap((category) => {
-                    const server = availableById.get(category.id);
-                    const spentCents = server?.spentCents ?? 0;
-                    const releasedCents = server?.cashflowReleasedCents ?? 0;
-                    const draft = parseIncomeToCents(drafts[category.id] ?? "");
-                    const assignedNow = draft ?? assignments[category.id] ?? 0;
-                    const availableNow =
-                      assignedNow - spentCents + releasedCents;
-                    const tone: DangerTone = classifySpendState(
-                      spentCents,
-                      assignedNow + releasedCents,
-                    );
-                    const proposal = proposals.find(
-                      (p) => p.categoryId === category.id,
-                    );
-                    const applying = busyKey === `apply:${proposal?.id}`;
-                    return [
-                      <TableRow
-                        key={category.id}
-                        state={tone === "healthy" ? "none" : tone}
+      <div className={styles.copyRow}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void handleCopy()}
+          disabled={!hasPreviousMonth || busyKey !== null}
+          aria-label="Copy last month's assignments"
+        >
+          {busyKey === "copy" ? "Copying…" : "Copy last month"}
+        </Button>
+      </div>
+      {!hasPreviousMonth ? (
+        <p className="hint">
+          No previous month to copy yet — this planner starts fresh.
+        </p>
+      ) : null}
+
+      {error ? (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      ) : null}
+
+      <div className={styles.groups}>
+        {GROUP_ORDER.flatMap((group) => {
+          const inGroup = categories.filter((c) => c.group === group);
+          if (inGroup.length === 0) return [];
+          const groupPlanned = inGroup.reduce((sum, category) => {
+            const draft = parseIncomeToCents(drafts[category.id] ?? "");
+            return (
+              sum + (draft ?? assignments[category.id] ?? 0)
+            );
+          }, 0);
+          return [
+            <section
+              key={`group-${group}`}
+              aria-label={GROUP_LABELS[group]}
+              className={styles.group}
+            >
+              <h2 className={styles.groupName}>{GROUP_LABELS[group]}</h2>
+              <span className={styles.groupTotal}>
+                {formatCents(groupPlanned)} planned
+              </span>
+              <ul className={styles.rows}>
+                {inGroup.map((category) => {
+                  const server = availableById.get(category.id);
+                  const spentCents = server?.spentCents ?? 0;
+                  const releasedCents = server?.cashflowReleasedCents ?? 0;
+                  const draft = parseIncomeToCents(drafts[category.id] ?? "");
+                  const assignedNow = draft ?? assignments[category.id] ?? 0;
+                  const availableNow =
+                    assignedNow - spentCents + releasedCents;
+                  const state = classifySpendState(
+                    spentCents,
+                    assignedNow + releasedCents,
+                  );
+                  const saving = busyKey !== null;
+                  return (
+                    <li
+                      key={category.id}
+                      className={styles.row}
+                      data-state={state}
+                    >
+                      <span className={styles.categoryName}>
+                        {category.name}
+                      </span>
+                      <span className={styles.plannedCell}>
+                        <PlannedAmountCell
+                          categoryId={category.id}
+                          categoryName={category.name}
+                          plannedCents={assignedNow}
+                          spentCents={spentCents}
+                          editing={editingId === category.id}
+                          saving={saving}
+                          validationId={`planned-validation-${category.id}`}
+                          validation={validation[category.id] ?? null}
+                          draft={drafts[category.id] ?? ""}
+                          onEdit={setEditingId}
+                          onDraftChange={setDraft}
+                          onCommit={(id) => void commitEdit(id)}
+                          onCancel={cancelEdit}
+                          registerRef={(id, node) => {
+                            if (node) {
+                              editButtonRefs.current.set(id, node);
+                            } else {
+                              editButtonRefs.current.delete(id);
+                            }
+                          }}
+                        />
+                      </span>
+                      <span className={styles.spentCell}>
+                        <span className={styles.valueLabel}>Spent</span>
+                        <span className={styles.value}>
+                          {formatCents(spentCents)}
+                        </span>
+                      </span>
+                      <span className={styles.leftCell}>
+                        <span className={styles.valueLabel}>Left</span>
+                        <span
+                          className={styles.value}
+                          data-negative={availableNow < 0 ? "true" : undefined}
+                        >
+                          {formatCents(availableNow)}
+                        </span>
+                      </span>
+                      <span className={styles.status} data-tone={state}>
+                        {state === "overspent"
+                          ? "Overspent"
+                          : state === "watch"
+                            ? "Watch"
+                            : "On track"}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>,
+          ];
+        })}
+      </div>
+
+      {proposals.length > 0 ? (
+        <section
+          aria-label="Sika recommendations"
+          data-testid="recommendations"
+          className={styles.recommendations}
+        >
+          {proposals.map((proposal) => {
+            const category = categories.find(
+              (c) => c.id === proposal.categoryId,
+            );
+            const categoryName = category?.name ?? "this category";
+            const currentCents = assignments[proposal.categoryId] ?? 0;
+            const applied = appliedId === proposal.id;
+            const applying = busyKey === `apply:${proposal.id}`;
+            const rtaAfter =
+              readyToAssignCents - proposal.suggestedCents + currentCents;
+            return (
+              <article
+                key={proposal.id}
+                data-testid={`proposal-${proposal.id}`}
+                className={styles.recommendationCard}
+              >
+                <p className={styles.recommendationHeading}>
+                  What Sika noticed
+                </p>
+                {applied ? (
+                  <p className={styles.appliedNote} data-visible="true" role="status">
+                    Applied — {formatCents(proposal.suggestedCents)} to{" "}
+                    {categoryName}.
+                  </p>
+                ) : (
+                  <>
+                    <p className={styles.recommendationNotice}>
+                      {proposal.reason ?? "Advisor suggestion"}
+                    </p>
+                    <p className={styles.recommendationExplainer}>
+                      Suggests {formatCents(proposal.suggestedCents)} to{" "}
+                      {categoryName}. {categoryName} goes from{" "}
+                      {formatCents(currentCents)} to{" "}
+                      {formatCents(proposal.suggestedCents)} planned. Ready to
+                      assign moves to {formatCents(rtaAfter)}.
+                    </p>
+                    <div className={styles.proposalActions}>
+                      <button
+                        type="button"
+                        className={styles.proposalApply}
+                        onClick={() => void handleApply(proposal)}
+                        disabled={busyKey !== null}
                       >
-                        <TableCell>{category.name}</TableCell>
-                        <TableCell>
-                          <form
-                            className={styles.assignForm}
-                            onSubmit={(event) => {
-                              event.preventDefault();
-                              void handleAssign(category.id);
-                            }}
-                          >
-                            <input
-                              aria-label={`Assign ${category.name}`}
-                              className={styles.assignInput}
-                              inputMode="decimal"
-                              placeholder="0.00"
-                              value={drafts[category.id] ?? ""}
-                              onChange={(event) =>
-                                setDrafts((prev) => ({
-                                  ...prev,
-                                  [category.id]: event.target.value,
-                                }))
-                              }
-                            />
-                            <Button
-                              type="submit"
-                              size="sm"
-                              variant="secondary"
-                              disabled={busyKey !== null}
-                            >
-                              {busyKey === `assign:${category.id}`
-                                ? "Assigning…"
-                                : "Assign"}
-                            </Button>
-                          </form>
-                        </TableCell>
-                        <TableCell>{formatCents(spentCents)}</TableCell>
-                        <TableCell>{formatCents(availableNow)}</TableCell>
-                        <TableCell>
-                          {tone === "overspent" ? (
-                            <Badge tone="overspent">Overspent</Badge>
-                          ) : null}
-                        </TableCell>
-                      </TableRow>,
-                      ...(proposal
-                        ? [
-                            // Advisor-proposed rows are display-only until
-                            // Apply: distinct tint, labeled suggestion, and
-                            // the only button that can mutate the ledger.
-                            <TableRow
-                              key={`proposal-${proposal.id}`}
-                              className={styles.proposalRow}
-                            >
-                              <TableCell colSpan={5}>
-                                <div className={styles.proposal}>
-                                  <Badge tone="info">Proposed</Badge>
-                                  <span>
-                                    {proposal.reason ?? "Advisor suggestion"}
-                                  </span>
-                                  <span className="muted">
-                                    Assign{" "}
-                                    {formatCents(proposal.suggestedCents)}
-                                  </span>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => void handleApply(proposal)}
-                                    disabled={busyKey !== null}
-                                  >
-                                    {applying ? "Applying…" : "Apply proposal"}
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>,
-                          ]
-                        : []),
-                    ];
-                  }),
-                ];
-              })}
-            </TableBody>
-          </Table>
-        </Card.Body>
-      </Card>
+                        {applying ? "Applying…" : "Apply"}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.proposalDismiss}
+                        onClick={() => handleDismiss(proposal.id)}
+                        disabled={busyKey !== null}
+                      >
+                        Not now
+                      </button>
+                    </div>
+                  </>
+                )}
+              </article>
+            );
+          })}
+        </section>
+      ) : null}
     </div>
   );
 }

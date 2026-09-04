@@ -1,171 +1,509 @@
-/*
- * Monthly planner styling (D6) — composes the shared design tokens and the
- * UI primitives (Card, Table, Badge, Button). No new colors here: proposal
- * rows read informational (primary-soft), overspent rows keep the danger
- * vocabulary from the danger-state classifier.
- */
+/* v1.1 editorial planner — Ready-to-Assign hero, open category-group
+   sections, inline-editable planned values, semantic row states. */
 
-.summaryRow {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-space-4);
-  flex-wrap: wrap;
-}
-
-.summaryRta {
+.planner {
   display: flex;
   flex-direction: column;
-  margin-right: auto;
+  gap: 2rem;
 }
 
-.summaryRta strong {
-  font-family: var(--sp-font-sans);
-  font-size: var(--sp-text-3xl);
-  font-weight: var(--sp-font-weight-bold);
-  line-height: var(--sp-leading-tight);
-}
+/* ── Ready-to-Assign hero ─────────────────────────────────────────── */
 
-.negative {
-  color: var(--sp-color-overspent);
-}
-
-.assignForm {
+.summary {
   display: flex;
-  align-items: center;
-  gap: var(--sp-space-2);
+  flex-direction: column;
+  gap: 0.35rem;
 }
 
-.assignInput {
-  width: 6.5rem;
-  padding: var(--sp-space-2) var(--sp-space-3);
-  border: 1px solid var(--sp-color-border);
-  border-radius: var(--sp-radius-md);
-  background: var(--sp-color-surface);
-  color: var(--sp-color-text);
-  font-family: var(--sp-font-sans);
-  font-size: var(--sp-text-md);
-  text-align: right;
-}
-
-.assignInput:focus-visible {
-  outline: none;
-  border-color: var(--sp-color-primary);
-  box-shadow: 0 0 0 var(--sp-space-1) var(--sp-color-focus-ring);
-}
-
-/* Group header rows — quiet labels between category sections. */
-.groupRow td {
-  padding-top: var(--sp-space-4);
-  padding-bottom: var(--sp-space-2);
-  font-weight: var(--sp-font-weight-semibold);
-  font-size: var(--sp-text-sm);
+.summaryLabel {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--sp-color-text-muted);
-  border-bottom: 1px solid var(--sp-color-border-strong);
+  color: var(--color-ink-soft);
 }
 
-/*
- * Advisor-proposed rows (D6/D12): visually distinct from both plain and
- * danger rows — informational teal tint with a solid left accent — and
- * display-only until the user applies them.
- */
-.proposalRow td {
-  padding: 0;
-  border-bottom: none;
+.summaryAmount {
+  font-family: var(--font-display);
+  font-size: clamp(2.75rem, 6vw, 4rem);
+  font-weight: 600;
+  line-height: 1.05;
+  color: var(--color-ink);
+  font-variant-numeric: lining-nums;
+  transition: color 160ms ease;
 }
 
-.proposalRow {
-  background: var(--sp-color-primary-soft);
-  box-shadow: inset 3px 0 0 var(--sp-color-primary);
+.summaryAmount[data-negative="true"] {
+  color: var(--color-danger);
 }
 
-.proposal {
+.summaryHint {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  color: var(--color-ink-soft);
+  max-width: 46ch;
+}
+
+.completionMessage {
+  margin-top: 0.25rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--color-bone);
+  border: 1px solid var(--color-line);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  color: var(--color-ink-soft);
+}
+
+.completionMessage[data-kind="balanced"] {
+  background: var(--color-sage-tint);
+  border-color: var(--color-sage);
+  color: var(--color-sage-ink);
+}
+
+.savedNote {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-sage-ink);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.savedNote[data-visible="true"],
+span.savedNote[role="status"] {
+  opacity: 1;
+}
+
+/* ── Copy previous month ──────────────────────────────────────────── */
+
+.copyRow {
   display: flex;
-  align-items: center;
-  gap: var(--sp-space-3);
-  flex-wrap: wrap;
-  padding: var(--sp-space-2) 0;
-  font-size: var(--sp-text-sm);
+  justify-content: flex-end;
 }
 
+/* ── Category-group sections (open, editorial — not a data grid) ──── */
 
-/*
- * Allocate-windfall banner (D13): income rows with the manual Allocate
- * action, the A7 auto-flag, and the ranked proposal. Same informational
- * tint family as proposal rows — suggestions, not ledger truth, until Apply.
- */
-.windfallHeader {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-space-1);
-}
-
-.windfallHeader h2 {
-  font-size: var(--sp-text-lg);
-  font-weight: var(--sp-font-weight-semibold);
-}
-
-.windfallRows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-space-2);
-  margin: var(--sp-space-3) 0;
-  padding: 0;
-  list-style: none;
-}
-
-.windfallRow {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-space-3);
-  flex-wrap: wrap;
-  font-size: var(--sp-text-sm);
-}
-
-.windfallAmount {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-}
-
-.windfallProposal {
-  border-top: 1px solid var(--sp-color-border);
-  padding-top: var(--sp-space-3);
+.groups {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-space-2);
+  gap: 2.25rem;
 }
 
-.windfallProposal h3 {
-  font-size: var(--sp-text-md);
-  font-weight: var(--sp-font-weight-semibold);
-}
-
-.windfallLines {
+.group {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-space-2);
+  gap: 0.25rem;
+}
+
+.groupName {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 1.0625rem;
+}
+
+.groupTotal {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--color-ink-soft);
+  font-variant-numeric: lining-nums;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.windfallLine {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-space-3);
-  flex-wrap: wrap;
-  padding: var(--sp-space-2);
-  background: var(--sp-color-primary-soft);
-  box-shadow: inset 3px 0 0 var(--sp-color-primary);
-  font-size: var(--sp-text-sm);
+.valueLabel {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
 }
 
-.windfallRemainder {
+/* ── Category rows ────────────────────────────────────────────────── */
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1.2fr) 6.5rem 6.5rem 6.5rem minmax(6rem, 1fr);
+  gap: 1rem;
+  align-items: baseline;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--color-line);
+  transition: background-color 160ms ease;
+}
+
+.row:hover {
+  background: var(--color-bone);
+}
+
+.row[data-state="overspent"] {
+  background: var(--color-danger-tint);
+}
+
+.row[data-state="watch"] .status {
+  color: var(--color-watch);
+}
+
+.row[data-state="healthy"] .status {
+  color: var(--color-ink-soft);
+}
+
+.categoryName {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-ink);
+}
+
+.value {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-variant-numeric: lining-nums;
+  color: var(--color-ink);
+}
+
+.value[data-negative="true"] {
+  color: var(--color-danger);
+}
+
+.status {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-variant-numeric: lining-nums;
+  color: var(--color-ink-soft);
+  text-align: right;
+}
+
+.status[data-tone="danger"] {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.status[data-tone="watch"] {
+  color: var(--color-watch);
+  font-weight: 600;
+}
+
+/* ── Inline planned-value editing ─────────────────────────────────── */
+
+.plannedButton {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  border: none;
+  background: none;
+  padding: 0.125rem 0.25rem;
+  margin-left: -0.25rem;
+  border-radius: 6px;
+  font: inherit;
+  cursor: text;
+  transition: background-color 160ms ease;
+}
+
+.plannedButton:hover:not(:disabled) {
+  background: var(--color-bone);
+}
+
+.plannedButton:focus-visible {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 2px;
+}
+
+.plannedButton:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.plannedValue {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-variant-numeric: lining-nums;
+  color: var(--color-ink);
+}
+
+/* The Edit cue is pointer-only decoration; the affordance itself is the
+   focusable button, so keyboard and touch users don't need it. */
+.editCue {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-terracotta);
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.plannedButton:hover .editCue,
+.plannedButton:focus-visible .editCue {
+  opacity: 1;
+}
+
+.editorWrap {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.editorInput {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  font-variant-numeric: lining-nums;
+  color: var(--color-ink);
+  background: var(--color-surface);
+  border: 1px solid var(--color-terracotta);
+  border-radius: 6px;
+  padding: 0.125rem 0.375rem;
+  width: 6rem;
+}
+
+.editorInput:focus {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 1px;
+}
+
+.editorInput:disabled {
+  opacity: 0.6;
+}
+
+.validation {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  color: var(--color-danger);
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Sika recommendation cards ────────────────────────────────────── */
+
+.recommendations {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.recommendationCard {
+  background: var(--color-bone);
+  border: 1px solid var(--color-line);
+  border-left: 3px solid var(--color-terracotta);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.recommendationHeading {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-terracotta);
+}
+
+.recommendationNotice {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-ink);
+  letter-spacing: 0.01em;
+}
+
+.recommendationExplainer {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: var(--color-ink-soft);
+}
+
+.proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.proposal:first-of-type {
+  border-top: none;
+}
+
+.proposalTitle {
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.proposalDetail {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-ink-soft);
+  font-variant-numeric: lining-nums;
+}
+
+.proposalActions {
   display: flex;
   align-items: center;
+  gap: 0.75rem;
+}
+
+.proposalApply {
+  border: none;
+  border-radius: 999px;
+  background: var(--color-terracotta);
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.4375rem 1.125rem;
+  cursor: pointer;
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.proposalApply:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.proposalApply:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.proposalApply:focus-visible {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 2px;
+}
+
+.proposalDismiss {
+  border: none;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--color-ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: color 140ms ease;
+}
+
+.proposalDismiss:hover:not(:disabled) {
+  color: var(--color-ink);
+}
+
+.proposalDismiss:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.proposalDismiss:focus-visible {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 2px;
+}
+
+.appliedNote {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-sage-ink);
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.appliedNote[data-visible="true"] {
+  opacity: 1;
+}
+
+/* ── Windfall banner rows (legacy surface, shared treatment) ──────── */
+
+.windfall {
+  background: var(--color-bone);
+  border: 1px solid var(--color-line);
+  border-left: 3px solid var(--color-terracotta);
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.windfallHeading {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-terracotta);
+}
+
+.windfallRow {
+  display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  gap: var(--sp-space-3);
-  padding: var(--sp-space-2);
-  font-size: var(--sp-text-sm);
+  gap: 1rem;
+  padding: 0.375rem 0;
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  color: var(--color-ink);
+  font-variant-numeric: lining-nums;
+}
+
+/* ── Narrow screens ───────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "name status"
+      "planned planned"
+      "spent left";
+    row-gap: 0.25rem;
+  }
+
+  .categoryName {
+    grid-area: name;
+  }
+
+  .plannedCell {
+    grid-area: planned;
+  }
+
+  .spentCell {
+    grid-area: spent;
+  }
+
+  .leftCell {
+    grid-area: left;
+  }
+
+  .status {
+    grid-area: status;
+  }
 }

@@ -96,6 +96,15 @@ test("the month loop: signup → assign → import → review → spend → dang
   await seedAccountsFor(email);
 
   // ── paycheck in, then assign every dollar (D6) ──────────────────────
+  // The empty planner is honest: no income and nothing assigned yet —
+  // never a premature "every dollar assigned" celebration (v1.1 fix).
+  await page.goto("/planner");
+  await expect(
+    page.getByText(
+      "Nothing to assign yet — Add this month's income to start your plan.",
+    ),
+  ).toBeVisible();
+
   await page.goto("/transactions");
   const manual = section(page, "Manual entry");
   await manual
@@ -122,13 +131,19 @@ test("the month loop: signup → assign → import → review → spend → dang
     ["Debt Payoff", "300.00"],
     ["Savings & Funds", "2250.00"],
   ];
+  // Planned values are edited in place: open the value, type, Enter — the
+  // same existing assignment action saves it (v1.1 inline editing).
   for (const [category, amount] of plan) {
-    const input = page.getByLabel(`Assign ${category}`);
-    await input.fill(amount);
     await page
-      .locator("tr", { has: input })
-      .getByRole("button", { name: "Assign" })
+      .getByRole("button", { name: `Edit planned amount for ${category}` })
       .click();
+    const input = page.getByRole("textbox", {
+      name: `Planned amount for ${category}`,
+    });
+    await input.fill(amount);
+    await input.press("Enter");
+    // The editor closes back into the value once the server confirms.
+    await expect(input).toHaveCount(0);
   }
   await expect(page.getByTestId("ready-to-assign")).toHaveText("$0.00");
   await expect(page.getByText("Every dollar assigned")).toBeVisible();
@@ -316,12 +331,19 @@ test("the month loop: signup → assign → import → review → spend → dang
   await proposal
     .getByRole("button", { name: "Apply Dining Out suggestion" })
     .click();
+  // The applied line names what just happened, then collapses out of the
+  // plan.
+  await expect(
+    proposal.getByText("Applied — $30.50 to Dining Out."),
+  ).toBeVisible();
   await expect(
     proposal.getByText("Overspent — cover the shortfall"),
   ).toHaveCount(0);
   await expect(page.getByTestId("ready-to-assign")).toHaveText("$5,769.50");
-  const diningRow = page.locator("tr", {
-    has: page.getByLabel("Assign Dining Out"),
+  const diningRow = page.getByRole("listitem").filter({
+    has: page.getByRole("button", {
+      name: "Edit planned amount for Dining Out",
+    }),
   });
   await expect(diningRow).toContainText("$0.00");
 
@@ -339,19 +361,32 @@ test("the month loop: signup → assign → import → review → spend → dang
   ).toHaveCount(0);
 
   await page.goto("/planner");
-  await expect(page.getByText("Proposed", { exact: true })).toHaveCount(3);
-  const transportProposal = page.locator("tr", {
-    hasText: "fuel for the moving-day runs",
-  });
+  const recommendations = page.getByTestId("recommendations");
+  // Season proposals render as separate Sika recommendation cards — never
+  // tinted rows dropped into the plan.
+  await expect(recommendations.getByText("What Sika noticed")).toHaveCount(3);
+  const transportCard = recommendations
+    .locator("article[data-testid^='proposal-']")
+    .filter({ hasText: "fuel for the moving-day runs" });
   // Season lines compose the current draft with the template target:
   // Transportation $300.00 draft + $25.00 target = $325.00 (was $300.00).
-  await expect(transportProposal).toContainText("Assign $325.00");
-  await transportProposal
-    .getByRole("button", { name: "Apply proposal" })
-    .click();
-  await expect(page.getByText("fuel for the moving-day runs")).toHaveCount(0);
-  const transportRow = page.locator("tr", {
-    has: page.getByLabel("Assign Transportation"),
+  await expect(transportCard).toContainText(
+    "Suggests $325.00 to Transportation",
+  );
+  await expect(transportCard).toContainText(
+    "Transportation goes from $300.00 to $325.00 planned",
+  );
+  await transportCard.getByRole("button", { name: "Apply" }).click();
+  await expect(
+    recommendations.getByText("Applied — $325.00 to Transportation."),
+  ).toBeVisible();
+  await expect(
+    recommendations.getByText("fuel for the moving-day runs"),
+  ).toHaveCount(0);
+  const transportRow = page.getByRole("listitem").filter({
+    has: page.getByRole("button", {
+      name: "Edit planned amount for Transportation",
+    }),
   });
   await expect(transportRow).toContainText("$25.00");
 

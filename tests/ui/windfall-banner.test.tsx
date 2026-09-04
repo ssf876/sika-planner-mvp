@@ -172,12 +172,96 @@ describe("WindfallBanner — the Allocate-windfall advisor surface", () => {
         }),
       ),
     );
+    // A brief Applied beat names what just happened...
     expect(
-      screen.queryByTestId("windfall-line-windfall:category:cat-groceries"),
-    ).toBeNull();
-    // The rest of the plan — including the remainder — stays visible.
+      await screen.findByText("Applied — $80.00 to Groceries."),
+    ).toBeInTheDocument();
+    // ...then the line collapses out of the plan while the rest stays.
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByTestId("windfall-line-windfall:category:cat-groceries"),
+        ).not.toBeInTheDocument(),
+      { timeout: 2000 },
+    );
     expect(
       screen.getByTestId("windfall-line-windfall:remainder"),
+    ).toBeInTheDocument();
+  });
+
+  it("speaks the recommendation language — what Sika noticed, what is suggested, and a quiet Not now", async () => {
+    const user = userEvent.setup();
+    renderBanner();
+
+    expect(screen.getByText("What Sika noticed")).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: "Allocate Stripe payout" }),
+    );
+
+    const proposal = screen.getByTestId("windfall-proposal");
+    expect(
+      within(proposal).getByText("Suggested plan for $750.00"),
+    ).toBeInTheDocument();
+    const groceries = screen.getByTestId(
+      "windfall-line-windfall:category:cat-groceries",
+    );
+    expect(within(groceries).getByText(/Assign \$80\.00/)).toBeInTheDocument();
+    expect(
+      within(groceries).getByRole("button", { name: "Not now" }),
+    ).toBeInTheDocument();
+  });
+
+  it("dismisses a line quietly with Not now — no action, no mutation", async () => {
+    const user = userEvent.setup();
+    renderBanner();
+
+    await user.click(
+      screen.getByRole("button", { name: "Allocate Stripe payout" }),
+    );
+    const groceries = screen.getByTestId(
+      "windfall-line-windfall:category:cat-groceries",
+    );
+    await user.click(
+      within(groceries).getByRole("button", { name: "Not now" }),
+    );
+
+    expect(
+      screen.queryByTestId("windfall-line-windfall:category:cat-groceries"),
+    ).not.toBeInTheDocument();
+    expect(applyWindfallLineAction).not.toHaveBeenCalled();
+    // The rest of the plan is untouched.
+    expect(
+      screen.getByTestId("windfall-line-windfall:fund:fund-ef"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("windfall-line-windfall:remainder"),
+    ).toBeInTheDocument();
+  });
+
+  it("tells the reader when a goal has no category to assign into yet", async () => {
+    const user = userEvent.setup();
+    renderBanner({
+      rankContext: {
+        ...rankContext,
+        goal: {
+          goalId: "goal-1",
+          name: "Pay off credit card",
+          kind: "PAYOFF_DEBT",
+          targetCents: 15000,
+          // No suggestedCategoryId — there is no category to assign into.
+        },
+      },
+    });
+
+    await user.click(
+      screen.getByRole("button", { name: "Allocate Stripe payout" }),
+    );
+
+    expect(
+      screen.getByText(
+        "No category to assign into yet — add one under Funds & goals.",
+      ),
     ).toBeInTheDocument();
   });
 

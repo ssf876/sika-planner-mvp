@@ -159,6 +159,43 @@ button[type="submit"]:disabled {
   color: var(--sp-color-healthy);
 }
 
+/* Anchor wearing the primary submit-button skin (e.g. the onboarding exit). */
+.button-link {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: var(--sp-radius-sm);
+  border: 1px solid var(--sp-color-primary);
+  background: var(--sp-color-primary);
+  color: var(--sp-color-text-contrast);
+  font: inherit;
+  font-weight: var(--sp-font-weight-semibold);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.button-link:hover {
+  background: var(--sp-color-primary-hover);
+  border-color: var(--sp-color-primary-hover);
+}
+
+.button-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--sp-color-focus-ring);
+}
+
+/* Accounts added during onboarding's setup step. */
+.created-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.created-list li {
+  padding: 0.375rem 0;
+  border-bottom: 1px solid var(--sp-color-border);
+  font-variant-numeric: var(--sp-numeric);
+}
+
 .month-strip {
   display: flex;
   gap: 2rem;
